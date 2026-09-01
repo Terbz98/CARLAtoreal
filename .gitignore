@@ -1,5 +1,7 @@
 # Bulk data. The working tree this was packaged from is ~550 GB; none of it belongs in git.
 datasets/
+!datasets/
+!datasets/README.md
 output/
 pix2pixHD/checkpoints/
 pix2pixHD/results/
