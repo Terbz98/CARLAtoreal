@@ -94,3 +94,36 @@ numbers and the picture disagreed, including the ones where the numbers won.
 
 Python 3 with PyTorch, OpenCV, NumPy and Pillow; CARLA 0.9.16 for recording; a CUDA GPU. A 2048-wide
 render peaks around 27 GB of VRAM, so run one GPU job at a time.
+
+## What is and is not in this repository
+
+**Code only.** No datasets, no trained weights, no rendered video. The working tree this was
+packaged from is ~550 GB; the repository is under 1 MB. A clone will not run until you supply:
+
+| Missing | Why | How to get it |
+|---|---|---|
+| Trained weights | ~200 MB per model, and derived from licensed training footage | Train from scratch (`train_v63_veg.sh` is a worked example), or request them separately |
+| Training corpus | Real driving footage, licensed separately | Not redistributable here — see `THIRD_PARTY_NOTICES.md` |
+| CARLA 0.9.16 | Records the drives | carla.org |
+| MoGe, DVP, Real-ESRGAN | Depth/normal channels, optional temporal and upscale stages | Upstream projects |
+| Perception stack (optional) | Only for `score_vp.py` scoring | Not part of this project; set `PERCEPTION_ROOT` |
+
+## Which version does what
+
+Two baselines, chosen by eye on side-by-side comparison rather than by metric:
+
+| Condition | Baseline | Delivery chain |
+|---|---|---|
+| Sunny | **v50d** | `make_v50d.sh` |
+| Night | **v59** | `render_model.sh night <model> v59 <Town...>` with `TEMPORAL=1` |
+
+Later candidate chains are included because they carry fixes the baselines predate:
+
+- `make_v50i.sh` / `make_v50j.sh` — sunny, with the vehicle-colour achromatic guard and the
+  per-region building-structure injection. `v50d` predates both.
+- `make_v51d.sh` — night, with per-class de-shimmer and despeckle.
+
+Neither candidate replaced its baseline: a candidate ships alongside, and the choice is made on a
+side-by-side clip. `docs/EXPERIMENTS.md` records why each was accepted or rejected, including the
+vegetation-loss work (notes 35–37) that improved distant foliage but overshot road grain to ~2x a
+real photograph and so was never promoted.
