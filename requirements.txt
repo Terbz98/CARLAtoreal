@@ -1,0 +1,26 @@
+# Versions this pipeline is known to run on (Python 3.10, Ubuntu 20.04, CUDA 12.8).
+# They are the ones actually installed in the environment that produced the delivered clips,
+# not a minimum-version guess.
+#
+#   conda create -n carla_env python=3.10 && conda activate carla_env
+#   pip install -r requirements.txt
+#
+# torch/torchvision carry a CUDA build tag. Install them from the PyTorch index for your driver:
+#   pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
+
+torch==2.11.0
+torchvision==0.26.0
+numpy==2.2.5
+scipy==1.15.3
+opencv-python==4.13.0
+pillow==12.2.0
+dominate==2.9.1          # pix2pixHD's HTML visualiser
+
+# Only for generating semantic labels from real video (Mask2Former). Not needed to render from
+# CARLA ground-truth labels, which is the documented path.
+transformers==5.9.0
+
+# Only for recording new drives. This is the simulator's own python API and its version MUST match
+# the installed CARLA server exactly -- 0.9.16 here. If you record with a different server, install
+# the matching egg/wheel from that release instead.
+carla==0.9.16

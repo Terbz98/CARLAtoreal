@@ -36,7 +36,13 @@ synthetic video useless for perception testing. Depth, normals and edges pin the
 
 ## Pipeline
 
-**1. Record.** Drive CARLA and capture RGB plus the semantic camera.
+**1. Record.** `record_town_auto.py --town Town05 --weather sunny --outname Town05_sunny_inst`
+drives CARLA on autopilot and captures RGB plus the semantic camera to
+`$CARLA2REAL_DATA/recorded_<outname>/`. NPCs are spawned near the ego rather than scattered over
+the whole map — a map-wide shuffle put 150 vehicles somewhere the ego never drove and yielded one
+visible car per frame. `prepare_gt_test_label.py` converts CARLA's semantic images to the
+trainId label maps the generator reads.
+
 CARLA writes BGRA; slicing `[:, :, :3]` yields BGR-as-RGB, so the channel order must be reversed
 before use. Getting this wrong is silent — the image looks plausible, just wrong.
 
@@ -93,8 +99,30 @@ numbers and the picture disagreed, including the ones where the numbers won.
 
 ## Requirements
 
-Python 3 with PyTorch, OpenCV, NumPy and Pillow; CARLA 0.9.16 for recording; a CUDA GPU. A 2048-wide
-render peaks around 27 GB of VRAM, so run one GPU job at a time.
+`requirements.txt` pins the versions that actually produced the delivered clips — Python 3.10,
+PyTorch 2.11 on CUDA 12.8, OpenCV 4.13. CARLA 0.9.16 is needed only for recording, and its python
+package version must match the running server exactly.
+
+A CUDA GPU is required. A 2048-wide render peaks around 27 GB of VRAM, so run one GPU job at a time;
+`gpu_wait.sh` exists to serialise them.
+
+## First run
+
+```bash
+git clone <this repo> && cd carla2real
+pip install -r requirements.txt
+cp config.sh config.local.sh          # then edit the paths, or export them in your shell
+. ./config.sh
+
+# A. render from an existing recording (needs weights in pix2pixHD/checkpoints/<model>/)
+./render_model.sh sunny carla2real_semantic_v50_graft v50 Town05
+
+# B. or record your own first (needs a CARLA server on localhost:2000)
+python3 record_town_auto.py --town Town05 --weather sunny --outname Town05_sunny_inst
+python3 prepare_gt_test_label.py
+```
+
+Nothing here downloads weights or data. See the table below for what you must supply.
 
 ## What is and is not in this repository
 
@@ -103,7 +131,7 @@ packaged from is ~550 GB; the repository is under 1 MB. A clone will not run unt
 
 | Missing | Why | How to get it |
 |---|---|---|
-| Trained weights | ~200 MB per model, and derived from licensed training footage | Train from scratch (`train_v63_veg.sh` is a worked example), or request them separately |
+| Trained weights | ~200 MB per model, and derived from licensed training footage | Train it yourself — `train_v50.sh` is the sunny baseline recipe and `train_v51_night.sh` the night one; `train_v63_veg.sh` / `train_v64_veg.sh` are shipped as worked *negative* results. Or request the weights separately. |
 | Training corpus | Real driving footage, licensed separately | Not redistributable here — see `THIRD_PARTY_NOTICES.md` |
 | CARLA 0.9.16 | Records the drives | carla.org |
 | MoGe, DVP, Real-ESRGAN | Depth/normal channels, optional temporal and upscale stages | Upstream projects |
