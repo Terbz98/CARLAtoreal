@@ -57,6 +57,7 @@ things worse:
 | `protect_buildings.py` | Injects CARLA's real facade structure. Applied per region and kept only where measured detail actually increases. |
 | `class_deshimmer.py` | Per-class temporal smoothing. Strength and motion tolerance vary by class, because a global filter smooths the stationary road (already stable) while missing buildings that sweep past the camera. |
 | `despeckle_night.py` | Removes isolated colourless bright blobs. Lamps and signals fail all three tests and survive. |
+| `fuse_colour.py` | Transfers one render's colour onto another's frames. Built because the two properties are separable: stability is temporal, vibrancy is per-frame colour. The transfer statistics are smoothed over a temporal window first, so only the slow colour trend crosses over and none of the source's frame-to-frame jitter. |
 
 **5. Measure.** `veg_report.py`, `tail_check.py`, `road_texture.py`, `true_instability.py`,
 `epoch_sweep.py`, `flicker_report.py`, and `score_vp.py` for end-to-end perception scoring against
