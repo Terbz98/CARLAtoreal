@@ -69,3 +69,10 @@ Mapillary Vistas 65 classes (`--label_nc 65`). Ids referenced throughout the cod
 CARLA writes BGRA. Slicing `[:, :, :3]` gives you BGR-as-RGB, so the channels must be reversed
 before use. Getting it wrong is silent — the image still looks plausible, just wrong — and it will
 poison every downstream channel.
+
+## The 21 training videos
+
+The remaining 28% of the corpus is a set of 21 driving videos whose provenance is unresolved — they
+are not redistributable and are not linked here. `TRAINING_VIDEOS.md` in this directory documents
+what they are, why they are withheld, and gives a checksum manifest so a copy can be identified.
+It also explains what training without them costs (in short: nothing for the sunny baselines).
