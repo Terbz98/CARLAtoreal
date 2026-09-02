@@ -714,3 +714,83 @@ the two renders side by side.
 
 STILL NOT PROMOTED. Road grain at 2.1x a real photograph is unchanged, the gate still fails, and
 v50d remains the sunny baseline until the user looks.
+
+### 38. v50k / v50l: stability and colour are separable, so fuse them instead of retraining
+Review verdict after watching the clips: v50d is "smooth, not flickery, but still blurry"; v63 has
+"nice vibrant colours but so flickery, and more blurry in some cases". Both halves checked out, and
+the measurement said WHY they are separable (Town10HD, frames 300-360):
+```
+clip    flicker (alt p99)   saturation   colourfulness   colour drift/frame   sharpness
+v50d               160.00         48.9            18.8                0.320       802.7
+v50j               120.00         48.2            18.2                0.319       682.9
+v63                189.00         44.1            23.1                0.637       674.1
+```
+Three things fall out of this table:
+- v63 is 18% flickerier and 23% more colourful, exactly as reported.
+- Its vibrancy is NOT saturation -- its saturation is LOWER (44.1 vs 48.9). It is colour
+  SEPARATION: v50d pushes the whole frame toward one cast, so its cars read muddy brown while
+  v63's red reads red.
+- **v50j is 25% less flickery than v50d** (120 vs 160), which nobody had measured. The shipped
+  baseline is not the most stable clip we have.
+
+WHY A NAIVE COLOUR COPY FAILS. v63's own frame-average colour drifts twice as fast as v50d's
+(0.637 vs 0.320), so matching colour per frame imports precisely the flicker being avoided.
+`fuse_colour.py` therefore smooths the Lab transfer statistics over a 61-frame window first: only
+the slow colour trend crosses, never the jitter. The carrier keeps every edge and all motion. L is
+transferred at 0.35 gain because shifting luminance changes exposure and with it apparent sharpness.
+
+RESULT:
+```
+clip    flicker   colourfulness   sharpness
+v50k     159.00            22.8       784.3     colour from v63 onto v50d
+v50l     120.00            23.4       677.1     colour from v63 onto v50j
+```
+**v50l is both the smoothest and the most colourful clip in the project** -- more colourful than
+v63 itself, at 63% of v63's flicker.
+
+AND THE EYE CAUGHT WHAT THE NUMBERS DID NOT: v50k's bus goes from magenta to hot PINK. v50d predates
+the achromatic guard (note 34), and a global grade AMPLIFIES a per-object hue error rather than
+fixing it. v50l has no such problem because its carrier already has the fix. Treat v50k as a dead
+end; it is built only because both were asked for.
+
+NOT FIXED: sharpness. v50l is 677, below v50d's 803. Colour and stability were separable; blur is a
+third axis and this does not touch it.
+
+### 39. The fusion across all five sunny towns: v50l holds, v50k confirmed dead (2026-09-02)
+
+v63's colour grade transferred onto two carriers, five towns each, all calibrated through Vision
+Pilot. `make_v50kl.sh`, finished 2026-09-01 20:49.
+
+Vision Pilot scores, mean over the five towns:
+
+| | cipo recall | range MAE | lane MAE |
+|---|---|---|---|
+| v50d | **0.887** | 1.623 | 0.204 |
+| v50j | 0.885 | 1.608 | 0.191 |
+| v63 | 0.836 | **1.456** | 0.199 |
+| v50k | 0.870 | 1.588 | 0.199 |
+| v50l | 0.879 | 1.620 | **0.196** |
+
+THE POINT. v63 alone costs 5.1 points of CIPO recall (0.887 -> 0.836) -- it is the worst model
+measured on the thing the perception stack exists to do, and Town04 is where it collapses
+(0.999 -> 0.833). v50l takes v63's colour and gives back only 0.8 points (0.879), while matching
+v50j's lane accuracy. The colour and the recall loss are separable, which is the whole claim of
+note 38 confirmed on 5x the data.
+
+Range MAE says the opposite -- v63 is best (1.456). Do not read that as v63 being better: its
+Town10HD figure (3.261 vs 4.001) carries the mean, and a model that detects fewer objects is
+scored on fewer, easier ranges. Recall and range MAE must be read together or not at all.
+
+LOOKED AT FRAMES, and the prediction from note 38 held in both towns that have the defect:
+  town10hd  v50d bus MAGENTA -> v50k MAGENTA AND MORE SATURATED   v50j red -> v50l red, richer
+  town03    v50d car violet  -> v50k violet, more saturated       v50j/v50l correct
+A global grade cannot fix a per-object hue error; it amplifies it. v50k is closed.
+
+One new v63 defect the frames show and no metric flagged: in Town05 it paints the white/red
+ambulance TEAL GREEN. v50l does not -- the carrier owns object colour, the grade only shifts the
+statistics. Another reason the fusion is the right shape.
+
+STILL UNSOLVED: sharpness. v50l inherits v50j's 677 against v50d's 803. Colour and stability were
+separable; blur is a third axis and fuse_colour.py does not touch it.
+
+Baselines UNCHANGED: sunny v50d, night v59. v50l is a candidate awaiting the user's eye.

@@ -1,4 +1,4 @@
-# WHERE WE ARE — 2026-08-31
+# WHERE WE ARE — 2026-09-01
 
 Read this first after any context loss. Companion to `EXPERIMENTS.md` (26 numbered findings).
 
@@ -730,3 +730,55 @@ Also still awaiting a look: v50j (5 sunny towns, colour + building fixes on the 
 
 CLOSED: vegetation loss shaping (notes 35, 36). Two opposite loss geometries both put road at
 1.8-2.0x; it is fine-tuning v50 on this corpus that does it, not the vegetation weighting.
+
+
+## FINISHED 2026-09-01 — nothing is running
+
+Both chained jobs completed. `render_model.sh` delivered v63 for Town03/04/05/06 (18:05);
+`make_v50kl.sh` finished 20:49 with all 5 towns x 2 variants fused, calibrated and scored.
+Delivered and organised:
+`calibrated/v63/sunny/`, `calibrated/v50k/sunny/`, `calibrated/v50l/sunny/` — 5 clips each.
+Per-town Vision Pilot scores in `logs_v63/`, `logs_v50k/`, `logs_v50l/`. **Results in note 39.**
+
+What they were (kept for the record), logged under `pix2pixHD/checkpoints/`:
+
+1. **`render_model.sh sunny carla2real_semantic_v63_veg v63 Town03 Town04 Town05 Town06`**
+   log `render_v63_log.txt`. ~2 h/town, DVP dominates.
+
+2. **`make_v50kl.sh`** log `v50kl_log.txt`. Waited for job 1 to exit, then for all 5 towns x 2
+   variants: fuse -> encode FINAL_1920 -> downscale to 1024x512 -> run Vision Pilot
+   `record_carla.sh` -> `score_vp.py` -> `organise_calibrated.sh` into
+   `calibrated/v50k/sunny/` and `calibrated/v50l/sunny/`.
+   It waits on `pgrep -x VisionPilot` before each run so two VP jobs never overlap.
+   Lossless fusion intermediates are ~1.3 GB each and are deleted immediately after encoding.
+
+### The fusion, in one line
+`fuse_colour.py <carrier> <colour_source> <out.avi> [strength] [window]` transfers Lab colour
+statistics, SMOOTHED over a temporal window, so vibrancy crosses over without flicker.
+**v50k** = v63 colour onto v50d. **v50l** = v63 colour onto v50j.
+
+**v50l is the candidate**, now confirmed over all five towns: it keeps v63's colour while giving
+back only 0.8 points of CIPO recall, where v63 alone costs 5.1 (0.887 -> 0.836). Best lane MAE of
+the fused pair. **v50k is a dead end, confirmed by eye in two towns**: a global grade cannot fix a
+per-object hue error, it amplifies it -- v50d's magenta bus and violet car both come out MORE
+saturated. See notes 38 and 39.
+
+### Still not fixed
+Sharpness. v50l is 677 against v50d's 803. Colour and stability were separable; blur is a third axis.
+
+BASELINES STILL sunny v50d, night v59 -- nothing promoted without the user's eye.
+AWAITING THE USER'S EYE: v50l (5 sunny towns, the fusion candidate), v63 (5 sunny towns),
+v50j (5 sunny), v51d (5 night).
+
+## RELEASE REPO (separate from this tree)
+`$CARLA2REAL_ROOT` -> https://github.com/Terbz98/CARLAtoreal (private).
+75+ files, ~600 KB, code only: no data, no weights, no video, no Vision Pilot source.
+Paths configurable via `config.sh` / `config.py`. pix2pixHD BSD licence restored verbatim.
+Licensed **Apache-2.0** (`LICENSE`, `NOTICE`) as of 2026-09-02, scoped to this project's code only --
+not the corpus, not weights derived from it, not the vendored pix2pixHD (BSD).
+Also now ships the entry points it was missing: `record_town_auto.py`, `prepare_gt_test_label.py`,
+`train_v50.sh`, `train_v51_night.sh`, `requirements.txt`.
+`THIRD_PARTY_NOTICES.md` records the open item: the 21 training videos called "NuRec" are NOT
+NVIDIA's NuRec, carry several different third-party creator watermarks, and have no provenance --
+treat as not redistributable. Mapillary + Cityscapes (72% of corpus) are properly licensed and
+linked in `datasets/README.md`. The user pushes manually from a real terminal.
