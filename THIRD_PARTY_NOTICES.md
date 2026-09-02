@@ -48,7 +48,7 @@ What inspection of the files themselves shows:
 
 - 2560x1440, 30 fps, uniformly ~900 frames — i.e. 30-second clips.
 - **They carry visible third-party creator watermarks, and different ones per video** — "ProArtInc"
-  on 00 and 03, "NORDIC" on 17, further distinct logos on 07, 12 and 20. Several different
+  on 00 and 03, "NOMADIC" on 17, further distinct logos on 07, 12 and 20. Several different
   creators, so this is compiled footage rather than one release.
 - They have audio tracks, which a reconstruction or a simulator render would not.
 - Re-encoded with ffmpeg/x264 at crf 15; any original metadata was lost in that pass.
