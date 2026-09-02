@@ -1,0 +1,16 @@
+carla2real
+Copyright 2026 Industrial Technology Research Institute (ITRI)
+
+This product includes software developed at
+Industrial Technology Research Institute (ITRI).
+
+This product contains modified source from pix2pixHD
+(https://github.com/NVIDIA/pix2pixHD), Copyright (c) 2018 NVIDIA Corporation
+and Copyright (c) 2017 Jun-Yan Zhu and Taesung Park, licensed under the BSD
+3-Clause style licence reproduced at pix2pixHD/LICENSE.txt. Modifications are
+listed in pix2pixHD/MODIFICATIONS.md.
+
+The Apache License, Version 2.0 in the LICENSE file covers this project's own
+code only. It does NOT extend to the training data, to any model weights
+derived from that data, or to the third-party components listed in
+THIRD_PARTY_NOTICES.md, each of which carries its own terms.

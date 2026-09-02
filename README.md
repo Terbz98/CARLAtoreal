@@ -124,6 +124,17 @@ python3 prepare_gt_test_label.py
 
 Nothing here downloads weights or data. See the table below for what you must supply.
 
+## Licence
+
+This project's own code is licensed under the **Apache License, Version 2.0** — see `LICENSE` and
+`NOTICE`. That covers the code in this repository and nothing else.
+
+It does **not** cover:
+
+- the **training corpus** (real driving footage, licensed separately — see `THIRD_PARTY_NOTICES.md`),
+- any **model weights** derived from that corpus, which inherit the corpus's terms,
+- the vendored **pix2pixHD** source, which keeps its own BSD licence at `pix2pixHD/LICENSE.txt`.
+
 ## What is and is not in this repository
 
 **Code only.** No datasets, no trained weights, no rendered video. The working tree this was
