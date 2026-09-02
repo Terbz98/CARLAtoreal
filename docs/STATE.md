@@ -178,15 +178,17 @@ v50g (new)                   73.7         41.0       1199.1        102.0
 5-town: CIPO 0.884 vs 0.887, range 1.52 vs 1.62, ghost 3.93 vs 4.49
 ```
 
-**v50g is the sunny candidate — 5 towns delivered, awaiting the user's eye.** Baselines remain
-sunny v50d, night v59 until they choose.
+**v50g was a sunny candidate and was not chosen.** Superseded: the sunny baseline is **v50l** as
+of 2026-09-02. Night remains v59.
 
 ## Baselines
 
 | weather | baseline | why |
 |---|---|---|
 | night | **v59** (`carla2real_semantic_v59_tnight3`) | user's call 2026-08-27, BY EYE from COMPARE_town10hd_night_v51_vs_v59.mp4. Metrics were a near-tie (flicker 22.70 vs 23.75, CIPO 0.865 vs 0.869, range 3.51 vs 3.27) so this is a visual preference, which is how every baseline here has been chosen. |
-| sunny | **v50d** | user's call 2026-08-24. Residual flicker — post-processing is at its ceiling, see below |
+| sunny | **v50m** | user's call 2026-09-02, replacing v50l the same day. v50l's delivery chain with three fixes: car de-shimmer tightened (trails), a robust + rate-limited colour grade (shade switching), unsharp 0.55→0.75 and CARLA facade injection 1.0→1.2 (sharpness). Measured on Town05: **real instability +1.2%** (warped residual 10.45 → 10.58) for **+15% detail**, less trailing (LAG 0.389 → 0.407), colour held, CIPO unchanged at 0.742. `make_v50m.sh`. |
+| sunny (previous) | v50l | user's call 2026-09-02, BY EYE. v63's colour grade carried by the v50j render (`fuse_colour.py` / `make_v50kl.sh`) — NOT a trained model. Over 5 towns against v50d: flicker −10.2%, colourfulness +23.2%, sharpness −2.9%, CIPO 0.879 vs 0.887, lane MAE 0.196 vs 0.204. Reproducing it needs the v50j chain AND a v63 render of the same town. |
+| sunny (previous) | v50d | user's call 2026-08-24, superseded 2026-09-02. Still the reference every v50x variant is measured against. |
 
 Sunny/night are **separate lineages and always have been**. Night uses `--light_input`, sunny uses
 `--chroma_input`, and neither has ever seen the other's data. There is no "v51 sunny" and there
@@ -766,7 +768,7 @@ saturated. See notes 38 and 39.
 ### Still not fixed
 Sharpness. v50l is 677 against v50d's 803. Colour and stability were separable; blur is a third axis.
 
-BASELINES STILL sunny v50d, night v59 -- nothing promoted without the user's eye.
+BASELINES: **sunny v50m** (promoted 2026-09-02 by the user, replacing v50l the same day), night v59.
 AWAITING THE USER'S EYE: v50l (5 sunny towns, the fusion candidate), v63 (5 sunny towns),
 v50j (5 sunny), v51d (5 night).
 
@@ -782,3 +784,40 @@ Also now ships the entry points it was missing: `record_town_auto.py`, `prepare_
 NVIDIA's NuRec, carry several different third-party creator watermarks, and have no provenance --
 treat as not redistributable. Mapillary + Cityscapes (72% of corpus) are properly licensed and
 linked in `datasets/README.md`. The user pushes manually from a real terminal.
+
+## v50m — in flight (2026-09-02)
+
+Three defects reported against v50l, each fixed at the stage that causes it. `make_v50m.sh`,
+log `pix2pixHD/checkpoints/v50m_log.txt`. Pilot on Town05 first, then the other four.
+
+1. **Car ghost trails (Town05).** Measured v50j 13.35 / v50l 13.42 on moving pixels — the fusion
+   adds nothing, the trails are inherited from the carrier. `class_deshimmer.py`'s own table sets
+   cars to 0.4 strength / 4.0 flow tolerance and warns they trail if loosened; v50j overrode both
+   to 0.85 / 6.0 to fix a car-flicker regression. v50m takes 0.55 / 4.5. Expect a small car-flicker
+   rise — flicker trades ~1:1 against ghosting and a trail is the more visible artefact.
+2. **Colour switching between shades.** The grade used whole-frame Lab mean/std, so one large
+   coloured object re-grades everything. `fuse_colour.py` gains `ROBUST=1` (median/MAD) and
+   `SLEW` (per-frame travel cap); window 61 → 91. A window alone only turns a jump into a ramp.
+3. **Not sharp enough.** Unsharp 0.55 → 0.75, CARLA facade injection 1.0 → 1.2. Both guarded, and
+   road grain must still be checked against the real-photograph ceiling (`road_sky_ceiling.py`).
+
+## The flicker metric misled a decision (2026-09-02)
+
+v50m was reported as 14% flickerier than v50l on `alt p99` (141.8 vs 124.0) and that number was
+acted on. It was wrong. Three separate knobs were swept to find the cause and NONE moved it:
+unsharp 0.75→0.60 (v50n, 139.1) and the car de-shimmer restored to v50j's 0.85/4.0 (v50p, 141.3).
+
+When three unrelated changes cannot shift a number, the number is not measuring the claimed thing.
+`true_instability.py` — which exists for exactly this — separates real shimmer from detail moving
+past the camera:
+
+```
+              warped resid (real)   plain alt (misleading)   detail
+v50l                    10.45                     13.27       806
+v50m                    10.58                     13.89       924
+v50p                    10.55                     13.80       928
+```
+
+**Real instability is +1.2%, not +14%.** The rest is v50m's extra detail being counted as
+alternation. Rule: never report `alt p99` across versions with different sharpness — use
+`true_instability.py`, or the comparison is meaningless.

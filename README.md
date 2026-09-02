@@ -85,6 +85,9 @@ So the tools here are built to be falsifiable rather than flattering:
 - `true_instability.py` separates real instability from detail in motion using optical flow.
 - `road_sky_ceiling.py` compares against real photographs, not against the previous model, because
   a comparison to the parent tells you a change is new, not that it is an improvement.
+- `true_instability.py` is the one to use for any stability claim across versions of differing
+  sharpness. The plain alternation metric counts a stationary detailed surface sweeping past a
+  moving camera as flicker, and has already sent this project chasing a regression that was 1%.
 
 Look at a frame before believing a number. `docs/EXPERIMENTS.md` records the cases where the
 numbers and the picture disagreed, including the ones where the numbers won.
@@ -154,14 +157,24 @@ Two baselines, chosen by eye on side-by-side comparison rather than by metric:
 
 | Condition | Baseline | Delivery chain |
 |---|---|---|
-| Sunny | **v50l** (since 2026-09-02) | `make_v50j.sh`, then `make_v50kl.sh` for the grade |
+| Sunny | **v50m** (since 2026-09-02) | `make_v50m.sh` |
 | Night | **v59** | `render_model.sh night <model> v59 <Town...>` with `TEMPORAL=1` |
 
-**v50l is not a trained model, and that is the point.** It is the v50j render carrying a colour
-grade lifted from v63 by `fuse_colour.py`. Reproducing it needs both: the v50j chain for the
-structure, and a v63 render of the same town, frame-aligned, for the colour. Over five towns
-against the previous v50d baseline: flicker −10.2%, colourfulness +23.2%, sharpness −2.9%,
-CIPO recall 0.879 vs 0.887, lane MAE 0.196 vs 0.204.
+**The sunny baseline is not a trained model, and that is the point.** `make_v50m.sh` renders with
+`v50_graft`, repairs it through the delivery chain, then grades it with colour lifted from a `v63`
+render of the same town by `fuse_colour.py`. Reproducing it needs both renders, frame-aligned.
+
+v50m is v50l plus three fixes, each aimed at a defect found by watching the clips:
+
+| defect | fix |
+|---|---|
+| ghost trails on moving vehicles | car de-shimmer strength 0.85 → 0.55, flow tolerance 6.0 → 4.5 |
+| colour switching between shades | grade driven by median/MAD instead of mean/std, plus a per-frame rate cap; window 61 → 91 |
+| not sharp enough | unsharp 0.55 → 0.75, CARLA facade injection 1.0 → 1.2 |
+
+Measured against v50l: **real instability +1.2%** (warped residual 10.45 → 10.58) for **+15%
+detail**, less trailing, colour held, detection recall unchanged. v50l in turn beat the older v50d
+baseline by −10.2% flicker and +23.2% colourfulness over five towns.
 
 The model the colour came from is the *worst* one measured on detection recall (v63, 0.836).
 Borrowing its colour beat adopting it, because stability is temporal and colour is per-frame —
@@ -172,7 +185,8 @@ before it predates:
 
 - `make_v50d.sh` — the previous sunny baseline. Predates the vehicle-colour and building fixes.
 - `make_v50i.sh` / `make_v50j.sh` — the vehicle-colour achromatic guard and the per-region
-  building-structure injection. `v50j` is v50l's carrier.
+  building-structure injection. `v50j` is the carrier both `v50l` and `v50m` are built on.
+- `make_v50kl.sh` — the first fusion, producing `v50l` (and `v50k`, which is closed).
 - `make_v51d.sh` — night, with per-class de-shimmer and despeckle.
 
 Do not apply the grade to `v50d` (that combination is `v50k`, and it is closed): a global grade
