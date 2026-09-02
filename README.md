@@ -154,16 +154,29 @@ Two baselines, chosen by eye on side-by-side comparison rather than by metric:
 
 | Condition | Baseline | Delivery chain |
 |---|---|---|
-| Sunny | **v50d** | `make_v50d.sh` |
+| Sunny | **v50l** (since 2026-09-02) | `make_v50j.sh`, then `make_v50kl.sh` for the grade |
 | Night | **v59** | `render_model.sh night <model> v59 <Town...>` with `TEMPORAL=1` |
 
-Later candidate chains are included because they carry fixes the baselines predate:
+**v50l is not a trained model, and that is the point.** It is the v50j render carrying a colour
+grade lifted from v63 by `fuse_colour.py`. Reproducing it needs both: the v50j chain for the
+structure, and a v63 render of the same town, frame-aligned, for the colour. Over five towns
+against the previous v50d baseline: flicker −10.2%, colourfulness +23.2%, sharpness −2.9%,
+CIPO recall 0.879 vs 0.887, lane MAE 0.196 vs 0.204.
 
-- `make_v50i.sh` / `make_v50j.sh` — sunny, with the vehicle-colour achromatic guard and the
-  per-region building-structure injection. `v50d` predates both.
+The model the colour came from is the *worst* one measured on detection recall (v63, 0.836).
+Borrowing its colour beat adopting it, because stability is temporal and colour is per-frame —
+so the two are separable and no retrain was needed. `docs/EXPERIMENTS.md` notes 38 and 39.
+
+Earlier chains are kept because they are the lineage, and because each carries a fix the one
+before it predates:
+
+- `make_v50d.sh` — the previous sunny baseline. Predates the vehicle-colour and building fixes.
+- `make_v50i.sh` / `make_v50j.sh` — the vehicle-colour achromatic guard and the per-region
+  building-structure injection. `v50j` is v50l's carrier.
 - `make_v51d.sh` — night, with per-class de-shimmer and despeckle.
 
-Neither candidate replaced its baseline: a candidate ships alongside, and the choice is made on a
-side-by-side clip. `docs/EXPERIMENTS.md` records why each was accepted or rejected, including the
+Do not apply the grade to `v50d` (that combination is `v50k`, and it is closed): a global grade
+amplifies a per-object hue error instead of fixing it, so v50d's magenta bus came out worse. The
+carrier must already have the achromatic guard. `docs/EXPERIMENTS.md` records why each was accepted or rejected, including the
 vegetation-loss work (notes 35–37) that improved distant foliage but overshot road grain to ~2x a
 real photograph and so was never promoted.
