@@ -2,14 +2,12 @@
 
 # carla2real
 
-**Turn CARLA simulation into photorealistic driving video — for testing perception systems.**
+**Turn CARLA simulation into photorealistic driving video, for testing perception systems.**
 
 [![License](https://img.shields.io/badge/Code-Apache_2.0-blue.svg)](LICENSE)
 [![Weights](https://img.shields.io/badge/Weights-CC_BY--SA_4.0-orange.svg)](weights/LICENSE)
 [![Data](https://img.shields.io/badge/Training_data-openly_licensed-brightgreen.svg)](datasets/README.md)
 [![CARLA](https://img.shields.io/badge/CARLA-0.9.16-lightgrey.svg)](https://carla.org)
-
-⭐ Star us on GitHub if you find this useful!
 
 </div>
 
@@ -19,7 +17,7 @@
 
 ## Why this exists
 
-Perception systems need to be tested on rare and dangerous scenarios — a child stepping out from
+Perception systems need to be tested on rare and dangerous scenarios: a child stepping out from
 behind a parked van, a car braking hard in fog at night. Those are cheap to *author* in a simulator
 and expensive or impossible to *film* on a real road.
 
@@ -29,12 +27,12 @@ scenario in CARLA, and get video a perception stack treats like a real camera fe
 
 ## What it does
 
-- 🎥 **Photorealistic video from any CARLA scenario** — any town, weather, traffic, time of day
-- 🌞🌙 **Two dedicated models** — one for daylight, one for night
-- 📊 **Measurable** — scored against ground truth using an external perception stack
-- ⚖️ **Openly licensed training data** — PandaSet and the Zenseact Open Dataset, nothing
+- 🎥 **Photorealistic video from any CARLA scenario.** Any town, weather, traffic, time of day
+- 🌞🌙 **Two dedicated models.** One for daylight, one for night
+- 📊 **Measurable.** Scored against ground truth using an external perception stack
+- ⚖️ **Openly licensed training data.** PandaSet and the Zenseact Open Dataset, nothing
   research-only
-- 🎯 **Stable, not flickery** — the usual failure of frame-by-frame generation is that every frame
+- 🎯 **Stable, not flickery.** The usual failure of frame-by-frame generation is that every frame
   invents a slightly different world; extra depth, edge and lighting inputs pin it down
 
 ## How it works
@@ -47,7 +45,7 @@ flowchart LR
     D --> E[Photorealistic<br/>1920x960 video]
 ```
 
-The generator turns a semantic label map — *road here, car there* — into an image. On its own that
+The generator turns a semantic label map (*road here, car there*) into an image. On its own that
 isn't enough: a label map says "building" but not *which* building, so the model invents a different
 facade every frame and the video shimmers. Feeding it depth, edges, surface normals and lighting
 from the simulator pins the world down so it stays the same from frame to frame.
@@ -55,7 +53,7 @@ from the simulator pins the world down so it stays the same from frame to frame.
 ## Getting started
 
 <details>
-<summary><b>Step 1 — Install</b></summary>
+<summary><b>Step 1. Install</b></summary>
 
 Requires [CARLA 0.9.16](https://carla.org) and Python 3.10+, with an NVIDIA GPU for rendering.
 
@@ -72,12 +70,12 @@ python3 scripts/init_asset_dirs.py
 ```
 
 Bulk data lives outside the repository. Either accept the defaults (`./datasets`, `./output`) or
-point `CARLA2REAL_DATA` and `CARLA2REAL_OUT` somewhere with space — a five-town run is tens of GB.
+point `CARLA2REAL_DATA` and `CARLA2REAL_OUT` somewhere with space. A five-town run is tens of GB.
 
 </details>
 
 <details>
-<summary><b>Step 2 — Get the model weights</b></summary>
+<summary><b>Step 2. Get the model weights</b></summary>
 
 Weights are published as release assets, not committed (they are 350 MB each).
 
@@ -85,12 +83,12 @@ Weights are published as release assets, not committed (they are 350 MB each).
 bash scripts/weights/fetch.sh
 ```
 
-They are licensed **CC BY-SA 4.0** — different from the code. See [`weights/README.md`](weights/README.md).
+They are licensed **CC BY-SA 4.0**, which is different from the code. See [`weights/README.md`](weights/README.md).
 
 </details>
 
 <details>
-<summary><b>Step 3 — Record a scenario in CARLA</b></summary>
+<summary><b>Step 3. Record a scenario in CARLA</b></summary>
 
 Start the simulator, then drive a town on autopilot while capturing camera and semantic output:
 
@@ -109,7 +107,7 @@ This writes RGB frames, semantic labels and a speed log to
 </details>
 
 <details>
-<summary><b>Step 4 — Render it photorealistic</b></summary>
+<summary><b>Step 4. Render it photorealistic</b></summary>
 
 ```bash
 # daylight
@@ -121,7 +119,7 @@ bash scripts/inference/render_model.sh night \
   carla2real_semantic_v79_clean_night v79 Town05
 ```
 
-Daylight needs two more steps, which is where a large part of the quality comes from — colour
+Daylight needs two more steps, which is where a large part of the quality comes from: colour
 grading and rebuilt ground shadows:
 
 ```bash
@@ -134,7 +132,7 @@ The finished 1920×960 video lands in `$CARLA2REAL_OUT/`.
 </details>
 
 <details>
-<summary><b>Step 5 (optional) — Score it against ground truth</b></summary>
+<summary><b>Step 5 (optional). Score it against ground truth</b></summary>
 
 If you have a perception stack, point `PERCEPTION_ROOT` at it and compare its output on the
 generated video against CARLA's ground truth:
@@ -143,14 +141,14 @@ generated video against CARLA's ground truth:
 python3 -m carla2real.evaluation.score_vp <gt.json> <perception.log> --json out.json
 ```
 
-Feed it **1024×512**, not the full 1920×960 — lateral accuracy is several times worse at the
+Feed it **1024×512**, not the full 1920×960. Lateral accuracy is several times worse at the
 larger size.
 
 </details>
 
 ## Results
 
-Measured with an external perception stack against CARLA ground truth — five towns, 1000 frames
+Measured with an external perception stack against CARLA ground truth, over five towns of 1000 frames
 each. CIPO recall is how reliably the closest in-path object is detected; lane error is lateral
 position accuracy.
 
