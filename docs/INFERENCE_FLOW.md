@@ -8,7 +8,7 @@ the code shows.
 
 > English translation of `docs/zh/INFERENCE_FLOW.zh.md`, which remains the original.
 >
-> **Dated 2026-09-14 and partly superseded.** The baselines are now v85d (sunny) and v79 (night);
+> **Dated 2026-09-14 and partly superseded.** The baselines are now v90dv (daylight) and v79 (night);
 > Q1 and Q3 below have since been addressed in the working tree. The open questions are kept as
 > written because the audit is what makes them traceable.
 

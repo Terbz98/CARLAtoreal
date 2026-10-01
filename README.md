@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/badge/Code-Apache_2.0-blue.svg)](LICENSE)
 [![Weights](https://img.shields.io/badge/Weights-CC_BY--SA_4.0-orange.svg)](weights/LICENSE)
-[![Data](https://img.shields.io/badge/Training_data-openly_licensed-brightgreen.svg)](datasets/README.md)
+[![Data](https://img.shields.io/badge/Fine--tuning_data-openly_licensed-yellow.svg)](#weight-provenance)
 [![CARLA](https://img.shields.io/badge/CARLA-0.9.16-lightgrey.svg)](https://carla.org)
 
 </div>
@@ -30,8 +30,9 @@ scenario in CARLA, and get video a perception stack treats like a real camera fe
 - 🎥 **Photorealistic video from any CARLA scenario.** Any town, weather, traffic, time of day
 - 🌞🌙 **Two dedicated models.** One for daylight, one for night
 - 📊 **Measurable.** Scored against ground truth using an external perception stack
-- ⚖️ **Openly licensed training data.** PandaSet and the Zenseact Open Dataset, nothing
-  research-only
+- ⚖️ **Openly licensed fine-tuning data.** The current models are fine-tuned on PandaSet and the
+  Zenseact Open Dataset only. Their starting weights are older, though; see
+  [Weight provenance](#weight-provenance)
 - 🎯 **Stable, not flickery.** The usual failure of frame-by-frame generation is that every frame
   invents a slightly different world; extra depth, edge and lighting inputs pin it down
 
@@ -77,7 +78,10 @@ point `CARLA2REAL_DATA` and `CARLA2REAL_OUT` somewhere with space. A five-town r
 <details>
 <summary><b>Step 2. Get the model weights</b></summary>
 
-Weights are published as release assets, not committed (they are 350 MB each).
+Weights are **not published yet**. The current checkpoints descend from earlier models that were
+trained on research-only data (see [Weight provenance](#weight-provenance)), so they will be released
+only once a from-scratch, licensed-only model replaces them. When they are, they ship as release
+assets (350 MB each), not committed files:
 
 ```bash
 bash scripts/weights/fetch.sh
@@ -112,19 +116,26 @@ This writes RGB frames, semantic labels and a speed log to
 ```bash
 # daylight
 TEXTURE=1 bash scripts/inference/render_model.sh sunny \
-  carla2real_semantic_v85_zod_fixed v85 Town05
+  carla2real_semantic_v90 v90 Town05
 
 # night
 bash scripts/inference/render_model.sh night \
   carla2real_semantic_v79_clean_night v79 Town05
 ```
 
-Daylight needs two more steps, which is where a large part of the quality comes from: colour
-grading and rebuilt ground shadows:
+Daylight needs more steps, which is where a large part of the quality comes from: colour grading,
+rebuilt ground shadows, and two passes that take from CARLA what the model cannot know:
 
 ```bash
-TAG=v85q BASE_TAG=v85 COLOUR_SRC=v50m bash experiments/delivery/make_v50r.sh
+TAG=v90q BASE_TAG=v90 COLOUR_SRC=v50m bash experiments/delivery/make_v50r.sh
 python3 -m carla2real.postprocessing.deepen_road_shadows <in.mp4> <carla_rgb/> <labels/> <out.mp4> 2.5
+
+# vehicles: shading, panel structure, livery and true paint colour from CARLA, per vehicle
+python3 -m carla2real.postprocessing.vehicle_pass <in.mp4> <carla_rgb/> <labels/> <out.mp4>
+
+# distance: vegetation loses colour and far objects pick up haze, as real cameras see them
+SAT_NEAR=0.85 SAT_FAR=0.55 HAZE=0.18 \
+  python3 -m carla2real.postprocessing.aerial_pass <in.mp4> <labels/> <depth/> <out.mp4>
 ```
 
 The finished 1920×960 video lands in `$CARLA2REAL_OUT/`.
@@ -154,12 +165,19 @@ position accuracy.
 
 | Condition | Model | CIPO recall ↑ | Lane error ↓ | Training data |
 |---|---|---|---|---|
-| ☀️ Daylight | **v85d** | **0.891** | 0.195 m | PandaSet + ZOD |
-| 🌙 Night | **v79** | **0.888** | 0.226 m | PandaSet + ZOD |
+| ☀️ Daylight | **v90dv** | 0.877 | 0.197 m | PandaSet + ZOD (fine-tuned) |
+| ☀️ Daylight, no vehicle pass | v90d | **0.894** | 0.191 m | PandaSet + ZOD (fine-tuned) |
+| 🌙 Night | **v79** | **0.888** | 0.226 m | PandaSet + ZOD (fine-tuned) |
 
-Both models are trained only on openly licensed data, and both are the best results this project
-has produced on these scenes. The numbers come from the perception stack reading the rendered video
-and being compared against what CARLA knows was actually there.
+The daylight baseline is **v90dv**, chosen by eye. The vehicle pass restores what the label map never
+told the model, such as an ambulance's markings and each car's real paint colour, and it fixes cars
+the model used to paint in two tones. It costs about 1.7 points of detection recall against v90d,
+which has the highest score this project has produced. Use v90d when the perception number matters
+more than appearance. The numbers come from the perception stack reading the rendered video and
+being compared against what CARLA knows was actually there.
+
+v90 is fine-tuned on PandaSet (all three forward cameras, daylight frames only, colour-matched) and
+10,000 ZOD frames.
 
 ## Licensing at a glance
 
@@ -171,6 +189,21 @@ and being compared against what CARLA knows was actually there.
 
 Weights are share-alike because ZOD is, and trained weights are treated as a derivative of their
 training data. Full detail in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+### Weight provenance
+
+Both current models were **fine-tuned**, not trained from scratch. Their final training data is
+PandaSet and ZOD only, but their starting weights come from a chain of earlier checkpoints:
+
+- **Daylight** v90 descends from v75, v73 and v50, which trained on Mapillary Vistas
+  (non-commercial), Cityscapes (research only) and driving video whose licence was never established.
+- **Night** v79 descends from v76, v69, v51 and v47, which trained on Dark Zurich and night driving
+  video of the same unestablished provenance.
+
+If trained weights count as a derivative of their training data, which is the reasoning this project
+already applies to ZOD's share-alike, then these checkpoints carry those restrictions. **For that
+reason they are not published.** A model trained from random initialisation on PandaSet and ZOD
+alone is in progress; its weights will be the first released.
 
 ## Documentation
 

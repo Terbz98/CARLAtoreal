@@ -75,6 +75,8 @@ PandaSet's Dataset Terms add conditions that survive into derived data: attribut
 Hesai, do not use their names or logos beyond attribution, and do not use the data to identify any
 person.
 
-**If you need weights without the share-alike question**, `v73` (sunny) and `v69` (night) train on
-PandaSet only — CC BY 4.0 — and score within half a CIPO point of the baselines. Both were kept for
-this reason.
+**No checkpoint is currently fit to publish.** An earlier revision of this file said `v73` (sunny)
+and `v69` (night) train on PandaSet only. They do not: v73's corpus includes Mapillary and Cityscapes,
+v69's includes Dark Zurich, and every baseline descends from them. See
+[Weight provenance](../THIRD_PARTY_NOTICES.md#weight-provenance). The first weights released will
+come from a model trained from random initialisation on PandaSet and ZOD alone, which is in progress.

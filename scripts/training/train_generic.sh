@@ -41,18 +41,39 @@ echo "  composition: $(ls "$DST/train_img" | sed 's/[0-9].*//' | sort | uniq -c 
 
 # Does this configuration need more input channels than the parent has? If so, graft rather than
 # let load_network silently discard the first conv.
+#
+# ASK THE PARENT HOW WIDE IT IS -- never guess from its NAME. An earlier version decided whether the
+# parent carried the roughness prior by looking for "tex" in the parent's name. A parent that carried
+# it under another name was then grafted 74 -> 75 channels, the model built 74, and load_network
+# silently random-initialised the input layers of the generator and all three discriminators. That
+# run trained for ten hours and was void. The arithmetic below mirrors pix2pixHD_model.py exactly:
+# normal and chroma are THREE channels each; edge, depth, light, texture and shadow are one.
+WANT_IN=65
+case "$ARCH$EXTRA" in *edge_input*)    WANT_IN=$((WANT_IN + 1)) ;; esac
+case "$ARCH$EXTRA" in *depth_input*)   WANT_IN=$((WANT_IN + 1)) ;; esac
+case "$ARCH$EXTRA" in *light_input*)   WANT_IN=$((WANT_IN + 1)) ;; esac
+case "$ARCH$EXTRA" in *chroma_input*)  WANT_IN=$((WANT_IN + 3)) ;; esac
+case "$ARCH$EXTRA" in *normal_input*)  WANT_IN=$((WANT_IN + 3)) ;; esac
+case "$ARCH$EXTRA" in *texture_input*) WANT_IN=$((WANT_IN + 1)) ;; esac
+case "$ARCH$EXTRA" in *shadow_input*)  WANT_IN=$((WANT_IN + 1)) ;; esac
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PARENT_W=$($PY "$HERE/read_conv_in.py" "$CK/$PARENT/latest_net_G.pth" 2>/dev/null)
+[ -n "${PARENT_W:-}" ] || { echo "  ABORT: cannot read the first-conv width of $PARENT" >> "$LOG"; exit 1; }
+NEW_CH=$((WANT_IN - PARENT_W))
+[ "$NEW_CH" -ge 0 ] || { echo "  ABORT: parent is $PARENT_W wide, config builds $WANT_IN; a wider parent cannot be grafted down" >> "$LOG"; exit 1; }
+echo "  channels: parent $PARENT_W, config $WANT_IN, graft $NEW_CH" >> "$LOG"
 INIT=$CK/${NAME}_init
 rm -rf "$INIT"; mkdir -p "$INIT"
-NEEDS_GRAFT=0
-case "$EXTRA" in *texture*) case "$PARENT" in *tex*|*combo*) ;; *) NEEDS_GRAFT=1 ;; esac ;; esac
-if [ "$NEEDS_GRAFT" = 1 ]; then
-  echo "  grafting $PARENT (+1 channel for the roughness prior)" >> "$LOG"
-  $CE python3 -u $BASE/make_v50_init.py "$CK/$PARENT" "$INIT" --new-channels 1 >> "$LOG" 2>&1 \
+if [ "$NEW_CH" -gt 0 ]; then
+  $CE python3 -u "$HERE/make_v50_init.py" "$CK/$PARENT" "$INIT" --new-channels "$NEW_CH" >> "$LOG" 2>&1 \
     || { echo "  ABORT: graft failed" >> "$LOG"; exit 1; }
 else
   cp "$CK/$PARENT"/latest_net_*.pth "$INIT/" 2>/dev/null \
     || { echo "  ABORT: no parent weights" >> "$LOG"; exit 1; }
 fi
+# re-read what will ACTUALLY be loaded and require an exact match, before a single epoch
+GOT=$($PY "$HERE/read_conv_in.py" "$INIT/latest_net_G.pth" 2>/dev/null)
+[ "${GOT:-0}" -eq "$WANT_IN" ] || { echo "  ABORT: init is ${GOT:-?} wide, config builds $WANT_IN" >> "$LOG"; exit 1; }
 
 cd $BASE/pix2pixHD
 ok=0

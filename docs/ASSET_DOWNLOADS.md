@@ -6,9 +6,10 @@ uploaded, replace "pending" with the download link.
 
 > English translation of `docs/zh/ASSET_DOWNLOADS.zh.md`, which remains the original.
 >
-> **Some of this is now out of date.** The baselines are v85d (sunny) and v79 (night) as of
-> 2026-09-22, not v75/v76, and weights are published as GitHub release assets — see
-> [`weights/README.md`](../weights/README.md). The structure and the caveats below still hold.
+> **Some of this is now out of date.** The baselines are v90dv (daylight) and v79 (night) as of
+> 2026-10-01, not v75/v76. Their weights are **not published**: both descend from checkpoints trained
+> on research-only data. See [Weight provenance](../THIRD_PARTY_NOTICES.md#weight-provenance). The
+> structure and the caveats below still hold.
 
 ## Creating the directories
 
