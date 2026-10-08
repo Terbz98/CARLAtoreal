@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pull the published fp16 baseline weights into pix2pixHD/checkpoints/ so the render scripts find
+# Pull the published fp16 weights into pix2pixHD/checkpoints/ so the render scripts find
 # them. Takes the release tag as its only argument; defaults to the latest release.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
@@ -13,7 +13,7 @@ else
   BASE="https://github.com/$REPO/releases/download/$TAG"
 fi
 
-for M in carla2real_semantic_v75_pz_tex carla2real_semantic_v79_clean_night; do
+for M in carla2real_semantic_v93n; do   # the only model trained from scratch on licensed data; see weights/README.md
   mkdir -p "$CK/$M"
   DST=$CK/$M/latest_net_G.pth
   if [ -s "$DST" ]; then

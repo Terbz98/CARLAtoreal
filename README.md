@@ -118,9 +118,11 @@ This writes RGB frames, semantic labels and a speed log to
 TEXTURE=1 bash scripts/inference/render_model.sh sunny \
   carla2real_semantic_v90 v90 Town05
 
-# night
+# night (v93n: trained from scratch on licensed data; weights in the GitHub release)
 bash scripts/inference/render_model.sh night \
-  carla2real_semantic_v79_clean_night v79 Town05
+  carla2real_semantic_v93n v93n Town05
+# then a subtle warm tint on the light sources (sodium-lamp look)
+python3 -m carla2real.postprocessing.warm_lights <in.mp4> <out.mp4>
 ```
 
 Daylight needs more steps, which is where a large part of the quality comes from: colour grading,
@@ -136,6 +138,9 @@ python3 -m carla2real.postprocessing.vehicle_pass <in.mp4> <carla_rgb/> <labels/
 # distance: vegetation loses colour and far objects pick up haze, as real cameras see them
 SAT_NEAR=0.85 SAT_FAR=0.55 HAZE=0.18 \
   python3 -m carla2real.postprocessing.aerial_pass <in.mp4> <labels/> <depth/> <out.mp4>
+
+# optional, experimental: soften over-sharp, cartoonish foliage
+python3 -m carla2real.postprocessing.tree_soften <in.mp4> <labels/> <out.mp4>
 ```
 
 The finished 1920×960 video lands in `$CARLA2REAL_OUT/`.
@@ -167,7 +172,8 @@ position accuracy.
 |---|---|---|---|---|
 | ☀️ Daylight | **v90dv** | 0.877 | 0.197 m | PandaSet + ZOD (fine-tuned) |
 | ☀️ Daylight, no vehicle pass | v90d | **0.894** | 0.191 m | PandaSet + ZOD (fine-tuned) |
-| 🌙 Night | **v79** | **0.888** | 0.226 m | PandaSet + ZOD (fine-tuned) |
+| 🌙 Night | **v93n** | 0.710 | 0.221 m | PandaSet + ZOD (**trained from scratch**, weights published) |
+| 🌙 Night, previous | v79 | **0.888** | 0.226 m | PandaSet + ZOD (fine-tuned, not published) |
 
 The daylight baseline is **v90dv**, chosen by eye. The vehicle pass restores what the label map never
 told the model, such as an ambulance's markings and each car's real paint colour, and it fixes cars
@@ -178,6 +184,11 @@ being compared against what CARLA knows was actually there.
 
 v90 is fine-tuned on PandaSet (all three forward cameras, daylight frames only, colour-matched) and
 10,000 ZOD frames.
+
+The night baseline is **v93n**, chosen by eye over v79. It is the first model trained from random
+initialisation on licensed data only, so its weights can be published. It scores lower on CIPO than
+v79, mostly on one town (Town04, a motorcyclist rendered too dark); longer-trained versions of it
+(v95n, v96n) reach 0.84 but were not preferred visually.
 
 ## Licensing at a glance
 
@@ -192,18 +203,20 @@ training data. Full detail in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 
 ### Weight provenance
 
-Both current models were **fine-tuned**, not trained from scratch. Their final training data is
-PandaSet and ZOD only, but their starting weights come from a chain of earlier checkpoints:
+The **night** baseline v93n was trained from random initialisation on PandaSet and ZOD only, and its
+fp16 weights are published as a release asset (`scripts/weights/fetch.sh`). The **daylight** baseline
+is fine-tuned, not trained from scratch. Its final training data is PandaSet and ZOD only, but its
+starting weights come from a chain of earlier checkpoints:
 
 - **Daylight** v90 descends from v75, v73 and v50, which trained on Mapillary Vistas
   (non-commercial), Cityscapes (research only) and driving video whose licence was never established.
-- **Night** v79 descends from v76, v69, v51 and v47, which trained on Dark Zurich and night driving
-  video of the same unestablished provenance.
+- The previous night baseline v79 descends from v76, v69, v51 and v47, which trained on Dark Zurich
+  and night driving video of the same unestablished provenance.
 
 If trained weights count as a derivative of their training data, which is the reasoning this project
 already applies to ZOD's share-alike, then these checkpoints carry those restrictions. **For that
-reason they are not published.** A model trained from random initialisation on PandaSet and ZOD
-alone is in progress; its weights will be the first released.
+reason they are not published.** A daylight model trained from scratch (v92c,
+`scripts/training/train_from_scratch_sunny.sh`) exists and is about one CIPO point behind v90dv.
 
 ## Documentation
 

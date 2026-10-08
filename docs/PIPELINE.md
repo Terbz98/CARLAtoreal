@@ -176,11 +176,13 @@ Two baselines, chosen by eye on side-by-side comparison rather than by metric:
 
 | Condition | Baseline | How to produce |
 |---|---|---|
-| Sunny | **v85d** (since 2026-09-22) | `TEXTURE=1 bash scripts/inference/render_model.sh sunny carla2real_semantic_v85_zod_fixed v85 <Town...>`, **then** `TAG=v85q BASE_TAG=v85 COLOUR_SRC=v50m make_v50r.sh`, **then** `deepen_road_shadows.py` |
-| Night | **v79** (since 2026-09-15) | `bash scripts/inference/render_model.sh night carla2real_semantic_v79_clean_night v79 <Town...>` |
+| Sunny | **v90dv** (since 2026-10-01) | `TEXTURE=1 bash scripts/inference/render_model.sh sunny carla2real_semantic_v90 v90 <Town...>`, **then** `TAG=v90q BASE_TAG=v90 COLOUR_SRC=v50m make_v50r.sh`, **then** `deepen_road_shadows.py` (2.5), **then** `vehicle_pass.py` |
+| Night | **v93n** (since 2026-10-08) | `bash scripts/inference/render_model.sh night carla2real_semantic_v93n v93n <Town...>`, **then** `warm_lights.py` |
 
-**Sunny is now fully licensed too.** v85 trains on PandaSet and ZOD alone — no Mapillary Vistas, no
-Cityscapes. Both baselines are free of research-only data as of 2026-09-22.
+**Licensing (corrected 2026-10-08).** The *final* training data of both is PandaSet and ZOD only, but
+only v93n is also trained from random initialisation; v90 is fine-tuned from checkpoints that saw
+Mapillary, Cityscapes and video of unestablished licence. Only v93n's weights are published. See
+`THIRD_PARTY_NOTICES.md`.
 
 Two things got it there, and neither was more data:
 
