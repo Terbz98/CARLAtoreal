@@ -125,22 +125,24 @@ bash scripts/inference/render_model.sh night \
 python3 -m carla2real.postprocessing.warm_lights <in.mp4> <out.mp4>
 ```
 
-Daylight needs more steps, which is where a large part of the quality comes from: colour grading,
-rebuilt ground shadows, and two passes that take from CARLA what the model cannot know:
+Daylight needs more steps, which is where a large part of the quality comes from. The current baseline **v98f**:
 
 ```bash
-TAG=v90q BASE_TAG=v90 COLOUR_SRC=v50m bash experiments/delivery/make_v50r.sh
-python3 -m carla2real.postprocessing.deepen_road_shadows <in.mp4> <carla_rgb/> <labels/> <out.mp4> 2.5
+# 0. soften CARLA's tree geometry before rendering (removes the low-poly pines' "brush streaks")
+python3 -m carla2real.postprocessing.veg_soften_inputs <labels_root> <softened_root> test_Town05_sunny_inst_gt
+DRR=<softened_root> TEXTURE=1 bash scripts/inference/render_model.sh sunny carla2real_semantic_v98 v98s Town05
 
-# vehicles: shading, panel structure, livery and true paint colour from CARLA, per vehicle
-python3 -m carla2real.postprocessing.vehicle_pass <in.mp4> <carla_rgb/> <labels/> <out.mp4>
+# 1. colour grading, then ground shadows from CARLA (HALOFIX=1: no bright rim of road around cars)
+TAG=v98sq BASE_TAG=v98s COLOUR_SRC=v50m bash experiments/delivery/make_v50r.sh
+HALOFIX=1 python3 -m carla2real.postprocessing.deepen_road_shadows <in.mp4> <carla_rgb/> <labels/> <out.mp4> 2.5
 
-# distance: vegetation loses colour and far objects pick up haze, as real cameras see them
-SAT_NEAR=0.85 SAT_FAR=0.55 HAZE=0.18 \
-  python3 -m carla2real.postprocessing.aerial_pass <in.mp4> <labels/> <depth/> <out.mp4>
+# 2. take from CARLA what the label map cannot say
+python3 -m carla2real.postprocessing.vehicle_pass <in.mp4> <carla_rgb/> <labels/> <out.mp4>   # paint, livery, shading
+python3 -m carla2real.postprocessing.sign_pass    <in.mp4> <carla_rgb/> <labels/> <out.mp4>   # traffic-sign faces
 
-# optional, experimental: soften over-sharp, cartoonish foliage
-python3 -m carla2real.postprocessing.tree_soften <in.mp4> <labels/> <out.mp4>
+# 3. clean-up
+python3 -m carla2real.postprocessing.car_edge_derim <in.mp4> <labels/> <out.mp4>              # no halo around cars
+python3 -m carla2real.postprocessing.far_stabilize  <in.mp4> <labels/> <depth/> <out.mp4>     # steady distant facades
 ```
 
 The finished 1920×960 video lands in `$CARLA2REAL_OUT/`.
@@ -170,12 +172,16 @@ position accuracy.
 
 | Condition | Model | CIPO recall ↑ | Lane error ↓ | Training data |
 |---|---|---|---|---|
-| ☀️ Daylight | **v90dv** | 0.877 | 0.197 m | PandaSet + ZOD (fine-tuned) |
+| ☀️ Daylight | **v98f** | 0.869 | 0.201 m | PandaSet + ZOD + ZOD nature frames (fine-tuned) |
+| ☀️ Daylight, previous | v90dv | 0.877 | 0.197 m | PandaSet + ZOD (fine-tuned) |
 | ☀️ Daylight, no vehicle pass | v90d | **0.894** | 0.191 m | PandaSet + ZOD (fine-tuned) |
 | 🌙 Night | **v93n** | 0.710 | 0.221 m | PandaSet + ZOD (**trained from scratch**, weights published) |
 | 🌙 Night, previous | v79 | **0.888** | 0.226 m | PandaSet + ZOD (fine-tuned, not published) |
 
-The daylight baseline is **v90dv**, chosen by eye. The vehicle pass restores what the label map never
+The daylight baseline is **v98f** (2026-10-15), chosen by eye: v90 fine-tuned with 2,296 extra green, leafy ZOD frames,
+rendered from tree-softened CARLA geometry, with CARLA sign faces, halo-free vehicle edges and stabilised distant
+facades. A real-world driving policy (VaVAM, see [`alpasim/`](alpasim/)) plans more like it does on raw CARLA on v98
+than on v90 (five-town plan agreement 1.28 vs 1.30). The previous baseline was **v90dv**. The vehicle pass restores what the label map never
 told the model, such as an ambulance's markings and each car's real paint colour, and it fixes cars
 the model used to paint in two tones. It costs about 1.7 points of detection recall against v90d,
 which has the highest score this project has produced. Use v90d when the perception number matters

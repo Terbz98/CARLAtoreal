@@ -49,7 +49,14 @@ BAND_PX = 16               # rows per reference band
 BAND_SMOOTH = 5
 REF_PCT = 75               # percentile of in-class luminance taken as "lit ground"
 FLOOR = 0.30               # never darker than this fraction of the render's own lit level
-MED = 15                   # anything thinner than this cannot survive into the shadow map
+MED = int(os.environ.get('MED', '15'))                  # anything thinner than this cannot survive into the shadow map
+# HALOFIX=1 (2026-10-13): the gain map is 1.0 on every non-ground pixel, and the median + blur below then
+# pulls the ground right next to each car back toward 1.0 -- exactly where CARLA's contact shadow is
+# deepest -- leaving a bright rim around every vehicle (ring 1-3 px outside cars minus ring 7-14 px:
+# +4.7 L before this pass, +10.9 after; the user saw "a white border around the cars"). With HALOFIX the
+# non-ground holes are filled from the surrounding ground gain (normalised convolution) before smoothing,
+# and the result is applied to ground pixels only, through a 1.5 px feather.
+HALOFIX = os.environ.get('HALOFIX', '0') == '1'
 
 
 def band_reference(g, m):
@@ -122,12 +129,35 @@ while n < total:
     if not touched:
         out.write(frame); n += 1; continue
 
+    if HALOFIX:
+        gm = np.isin(lab, GROUND).astype(np.float32)
+        den = cv2.GaussianBlur(gm, (0, 0), 12.0)
+        fill = cv2.GaussianBlur(gain * gm, (0, 0), 12.0) / np.maximum(den, 1e-3)
+        gain = np.where(gm > 0, gain, np.where(den > 1e-3, fill, 1.0)).astype(np.float32)
     # the map is smoothed, not the frame: a median kills anything thinner than a real shadow, and
     # the blur keeps the render's own grain intact because only the GAIN is blurred
     gain = cv2.medianBlur((np.clip(gain, FLOOR, 1.0) * 255).astype(np.uint8), MED).astype(np.float32) / 255.0
     gain = cv2.GaussianBlur(gain, (0, 0), 4.0)
     gain = 1.0 + (gain - 1.0) * STRENGTH
-    res = np.clip(frame.astype(np.float32) * gain[:, :, None], 0, 255).astype(np.uint8)
+    if HALOFIX:
+        feather = cv2.GaussianBlur(gm, (0, 0), 1.5)
+        gain = 1.0 + (gain - 1.0) * feather
+    res = np.clip(frame.astype(np.float32) * gain[:, :, None], 0, 255)
+    if HALOFIX:
+        # the render itself draws a bright rim of road around vehicles (+7 L before this pass; v50m +2.5):
+        # ground within RIM px of a vehicle may be no brighter than the ground just beyond that band
+        VEH = np.isin(lab, [52, 54, 55, 56, 57, 58, 59, 60, 61, 62]).astype(np.uint8)
+        if VEH.sum() > 500:
+            RIM = int(os.environ.get('RIM', '6'))
+            near = (cv2.dilate(VEH, np.ones((2 * RIM + 1, 2 * RIM + 1), np.uint8)) > 0) & (VEH == 0) & (gm > 0)
+            ref_m = (gm > 0) & ~near & (VEH == 0)
+            Lr = cv2.cvtColor(res.astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32)
+            den = cv2.GaussianBlur(ref_m.astype(np.float32), (0, 0), 10.0)
+            loc = cv2.GaussianBlur(Lr * ref_m, (0, 0), 10.0) / np.maximum(den, 1e-3)
+            g2 = np.where(near & (den > 1e-2) & (Lr > loc), loc / np.maximum(Lr, 1.0), 1.0).astype(np.float32)
+            g2 = cv2.GaussianBlur(g2, (0, 0), 1.0)
+            res = res * g2[:, :, None]
+    res = np.clip(res, 0, 255).astype(np.uint8)
     out.write(res)
     changed += 1
     n += 1

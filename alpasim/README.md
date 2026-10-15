@@ -27,6 +27,7 @@ waypoint.
 | **v90dv** (daylight baseline) | 0.88 | 1.39 | 1.78 | 0.68 | 1.85 | 1.32 |
 | v90dva (+ distance fade) | 0.87 | 1.36 | 1.66 | 0.73 | 1.87 | **1.30** |
 | v92cdv (trained from scratch) | 0.84 | 1.31 | 2.59 | 0.86 | 1.53 | 1.43 |
+| **v98f** (daylight baseline from 2026-10-15) | 0.93 | 1.36 | 1.48 | 0.84 | 1.81 | **1.28** |
 
 **Town10HD, sunny and night (2026-10-08).** Each is compared with raw CARLA in the *same* weather
 (night renders against the CARLA night drive):
