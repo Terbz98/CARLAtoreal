@@ -4,7 +4,7 @@ Noise floor: VaVAM is not bit-deterministic on CPU; the same input moves a waypo
 import numpy as np, json, glob, os
 os.chdir(os.environ.get('ALPASIM_DIR', os.path.dirname(os.path.abspath(__file__))))
 out = {}
-TOWNS = [t for t in ['town05', 'town10hd', 'town03', 'town04', 'town06', 'town10hd_night'] if os.path.exists(f'results/{t}_CARLA_plans.npy')]
+TOWNS = [t for t in ['town05', 'town10hd', 'town03', 'town04', 'town06', 'town10hd_night', 'town05_night', 'town03_night', 'town04_night', 'town06_night'] if os.path.exists(f'results/{t}_CARLA_plans.npy')]
 for town in TOWNS:
     def L(t):
         a = np.load(f'results/{town}_{t}_plans.npy'); return {int(r[0]): r[1:].reshape(-1, 2) for r in a}

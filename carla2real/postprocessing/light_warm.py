@@ -34,6 +34,12 @@ def process(im, li, lab_ids=None):
         vm = cv2.resize(np.isin(lab_ids, [52, 54, 55, 56, 57, 58, 59, 60, 61, 62]).astype(np.uint8), (W, H), interpolation=cv2.INTER_NEAREST)
         VM = int(os.environ.get('VEH_MARGIN', '25'))
         w *= 1 - cv2.GaussianBlur(cv2.dilate(vm, np.ones((VM, VM), np.uint8)).astype(np.float32), (0, 0), VM / 3)
+        # buildings only half as warm: user, 2026-10-22, "on buildings don't make it too yellow, like the middle of
+        # yellow street lamp and car light". BLD_SCALE 1.0 = old behaviour.
+        BS = float(os.environ.get('BLD_SCALE', '1.0'))
+        if BS != 1.0:
+            bm = cv2.resize(np.isin(lab_ids, [17, 6]).astype(np.float32), (W, H), interpolation=cv2.INTER_NEAREST)
+            w *= 1 - (1 - BS) * cv2.GaussianBlur(bm, (0, 0), 2.0)
     lab[..., 2] += WB * w; lab[..., 1] += WA * w
     return cv2.cvtColor(np.clip(np.round(lab), 0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
 

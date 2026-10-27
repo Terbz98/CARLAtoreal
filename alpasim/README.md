@@ -39,6 +39,15 @@ waypoint.
 | **v93n** (night baseline, trained from scratch) | **0.89** |
 | v93nw (+ warm light tint) | 1.05 |
 
+**Night, five towns (2026-10-17).** Each night render against the CARLA night drive of the same town:
+
+| render | Town10HD | Town05 | Town03 | Town04 | Town06 | five-town mean |
+|---|---:|---:|---:|---:|---:|---:|
+| v51 (old night) | 0.87 | 1.10 | 1.46 | 0.88 | 0.95 | **1.05** |
+| **v93n** (night baseline) | 0.89 | 1.27 | 1.67 | 0.87 | 1.06 | 1.15 |
+| v97n (+ warm-lamp training data) | 0.88 | 1.11 | 1.75 | 1.08 | 0.96 | 1.16 |
+| v97n + street-lamp-only warmth (40) | 0.92 | 1.05 | 1.65 | 0.99 | 1.01 | 1.12 |
+
 Softening the trees leaves the policy's plans unchanged. The warm light tint moves them by 0.16 m:
 the policy reacts to the colour of lit areas at night, so the tint is a look choice with a measurable
 cost, not a free one.
