@@ -170,6 +170,19 @@ Measured with an external perception stack against CARLA ground truth, over five
 each. CIPO recall is how reliably the closest in-path object is detected; lane error is lateral
 position accuracy.
 
+**Real-trained perception works better on our video than on CARLA itself.** The same perception stack,
+trained on real cameras, run on the raw simulator frames of the same drives:
+
+| | Raw CARLA | carla2real | |
+|---|---:|---:|---|
+| ☀️ Daylight CIPO recall | 0.588 | **0.871** (v98fnb) | Town04: 0.15 → 0.98 |
+| 🌙 Night CIPO recall | 0.822 | **0.850** (v97nL30d) | |
+
+**A real-world driving policy behaves on our video more like it does on real footage.** VaVAM (see
+[`alpasim/`](alpasim/)) on 103 real PandaSet drives plans about 78% of the distance actually driven
+over the next 3 s. On raw CARLA it plans only 64% (it is far more cautious, treating the simulator as
+unfamiliar); on carla2real daylight 70%.
+
 | Condition | Model | CIPO recall ↑ | Lane error ↓ | Training data |
 |---|---|---|---|---|
 | ☀️ Daylight | **v98f** | 0.869 | 0.201 m | PandaSet + ZOD + ZOD nature frames (fine-tuned) |

@@ -52,6 +52,24 @@ Softening the trees leaves the policy's plans unchanged. The warm light tint mov
 the policy reacts to the colour of lit areas at night, so the tint is a look choice with a measurable
 cost, not a free one.
 
+## Real-video reference
+
+`pandaset_vavam.py` runs VaVAM on PandaSet's 103 real drives (front camera, 8 s at 10 Hz, camera
+poses) and scores each plan against the path actually driven: 306 decisions, 3 s plan 24.5 m vs
+31.8 m driven, lateral error 0.38 m. The command (straight vs the true turn) makes no difference.
+
+Planned / driven distance at 3 s, drives of 25-35 m:
+
+| video | plan / driven |
+|---|---:|
+| real (PandaSet) | **0.78** |
+| raw CARLA | 0.64 |
+| carla2real v98fnb | 0.70 |
+| carla2real, brighter grade | 0.77 |
+
+Plan agreement with raw CARLA therefore rewards copying CARLA's unreal caution; the real-video ratio is
+the complementary check.
+
 ## Running it
 
 ```bash
