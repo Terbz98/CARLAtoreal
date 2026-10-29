@@ -178,6 +178,14 @@ trained on real cameras, run on the raw simulator frames of the same drives:
 | ☀️ Daylight CIPO recall | 0.588 | **0.871** (v98fnb) | Town04: 0.15 → 0.98 |
 | 🌙 Night CIPO recall | 0.822 | **0.864** (v97nL30f) | |
 
+**Priority.** Vision Pilot detection is the main target. The driving policy below is used as an accuracy check: its plan
+is scored against the path the car actually drove, not against its plan on raw CARLA (that comparison makes raw CARLA
+perfect by definition).
+
+**Video compression matters.** Each post-processing stage re-encodes the clip; with lossy mp4v at every stage, Town03
+detection fell from 0.937 to 0.911 after a single extra re-encode. Set `FOURCC=FFV1` to make every stage lossless
+(`carla2real/common/vidcodec.py`).
+
 **A real-world driving policy behaves on our video more like it does on real footage.** VaVAM (see
 [`alpasim/`](alpasim/)) on 103 real PandaSet drives plans about 78% of the distance actually driven
 over the next 3 s. On raw CARLA it plans only 64% (it is far more cautious, treating the simulator as

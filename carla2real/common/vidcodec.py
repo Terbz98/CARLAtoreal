@@ -12,11 +12,15 @@ intermediate stages can be lossless and only the delivered file needs compressin
 Callers opt in simply by naming the intermediate .avi; anything else keeps mp4v, so existing
 chains behave exactly as before.
 """
+import os
+
 import cv2
 
 LOSSLESS_EXT = ('.avi', '.mkv')
 
 
 def fourcc_for(path):
+    # FOURCC=FFV1 makes every stage lossless, delivered .mp4 files included (2026-10-28: six mp4v generations in the sunny
+    # chain; one null re-encode alone cost Town03 CIPO 0.937 -> 0.911). Unset = the old behaviour.
     p = str(path).lower()
-    return cv2.VideoWriter_fourcc(*('FFV1' if p.endswith(LOSSLESS_EXT) else 'mp4v'))
+    return cv2.VideoWriter_fourcc(*('FFV1' if p.endswith(LOSSLESS_EXT) else os.environ.get('FOURCC', 'mp4v')))
