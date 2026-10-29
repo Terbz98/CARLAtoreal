@@ -14,6 +14,7 @@ from PIL import Image
 from carla2real.common.vidcodec import fourcc_for
 LO, HI, M = float(os.environ.get('LO', '110')), float(os.environ.get('HI', '190')), int(os.environ.get('MARGIN', '10'))
 EGO = float(os.environ.get('EGO', '0'))      # >0: also the ego headlight pool, lowest EGO fraction of the frame
+BODY = os.environ.get('BODY', '0') == '1'   # 1 = old behaviour: beam colour zone also covers vehicle bodies
 BEAM = float(os.environ.get('BEAM', '0'))   # >0: also whiten the light thrown below/ahead of each vehicle, BEAM x its height
 VEH = [52, 54, 55, 56, 57, 58, 59, 60, 61, 62]
 
@@ -40,7 +41,10 @@ def process(base, donor, l):
         yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
         top = H * (1 - EGO); half = (W * 0.18) + (yy - top) / max(H - top, 1) * W * 0.45
         bz = np.maximum(bz, ((yy > top) & (np.abs(xx - W / 2) < half) & np.isin(l, [13, 15, 2, 23, 24])).astype(np.float32))
-    bz = np.maximum(bz * (~np.isin(l, [27, 17, 6])), zone)   # not onto sky or building fronts far behind
+    bz = bz * (~np.isin(l, [27, 17, 6]))   # not onto sky or building fronts far behind
+    if BODY: bz = np.maximum(bz, zone)
+    else: bz = bz * (1 - v)              # the thrown light only: leave car bodies' colour alone (re-colouring whole
+                                         # vehicles from v93n cost night Town04 CIPO .904 -> .856, 2026-10-28)
     bz = cv2.GaussianBlur(bz, (0, 0), 12)[..., None]
     A, Dn = cv2.cvtColor(out, cv2.COLOR_BGR2LAB).astype(np.float32), cv2.cvtColor(donor, cv2.COLOR_BGR2LAB).astype(np.float32)
     A[..., 1:] = A[..., 1:] * (1 - bz) + Dn[..., 1:] * bz

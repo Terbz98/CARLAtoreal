@@ -176,7 +176,7 @@ trained on real cameras, run on the raw simulator frames of the same drives:
 | | Raw CARLA | carla2real | |
 |---|---:|---:|---|
 | ☀️ Daylight CIPO recall | 0.588 | **0.871** (v98fnb) | Town04: 0.15 → 0.98 |
-| 🌙 Night CIPO recall | 0.822 | **0.850** (v97nL30d) | |
+| 🌙 Night CIPO recall | 0.822 | **0.864** (v97nL30f) | |
 
 **A real-world driving policy behaves on our video more like it does on real footage.** VaVAM (see
 [`alpasim/`](alpasim/)) on 103 real PandaSet drives plans about 78% of the distance actually driven
@@ -188,11 +188,9 @@ unfamiliar); on carla2real daylight 70%.
 | ☀️ Daylight | **v98f** | 0.869 | 0.201 m | PandaSet + ZOD + ZOD nature frames (fine-tuned) |
 | ☀️ Daylight, previous | v90dv | 0.877 | 0.197 m | PandaSet + ZOD (fine-tuned) |
 | ☀️ Daylight, no vehicle pass | v90d | **0.894** | 0.191 m | PandaSet + ZOD (fine-tuned) |
-| 🌙 Night | **v97nL30d** | 0.857 ¹ | — | v93n fine-tuned with warm-lamp PandaSet + ZOD frames |
+| 🌙 Night | **v97nL30f** | 0.864 | 0.230 m | v93n fine-tuned with warm-lamp PandaSet + ZOD frames |
 | 🌙 Night, previous | v93n | 0.710 | 0.221 m | PandaSet + ZOD (**trained from scratch**, weights published) |
 | 🌙 Night, older | v79 | **0.888** | 0.226 m | PandaSet + ZOD (fine-tuned, not published) |
-
-¹ CIPO of the v97n render before the light passes.
 
 The daylight baseline is **v98f** (2026-10-15), chosen by eye: v90 fine-tuned with 2,296 extra green, leafy ZOD frames,
 rendered from tree-softened CARLA geometry, with CARLA sign faces, halo-free vehicle edges and stabilised distant
@@ -207,19 +205,19 @@ being compared against what CARLA knows was actually there.
 v90 is fine-tuned on PandaSet (all three forward cameras, daylight frames only, colour-matched) and
 10,000 ZOD frames.
 
-The night baseline is **v97nL30d** (2026-10-27), chosen by eye: the v97n model (v93n fine-tuned with 5,735 licensed
+The night baseline is **v97nL30f** (2026-10-29), chosen by eye: the v97n model (v93n fine-tuned with 5,735 licensed
 frames of warm sodium street lighting), then a sodium tint only where CARLA's street lamps light the scene (building
 fronts at about a third of it, lane markings and vehicles excluded), with vehicle lamps and the light they throw onto
-the road copied from v93n so they stay white. Commands:
+the road taken from v93n so they stay white, while each car body keeps its own colour. Commands:
 
 ```bash
 WARM_B=30 WARM_A=7 BLD_SCALE=0.35 python -m carla2real.postprocessing.light_warm \
   v97n.mp4 <light_dir> lamps.mp4 <label_dir>
-LO=60 HI=130 MARGIN=14 BEAM=3 EGO=0.45 python -m carla2real.postprocessing.car_lights_from \
-  lamps.mp4 v93n.mp4 <label_dir> v97nL30d.mp4
+BODY=0 LO=120 HI=190 MARGIN=14 BEAM=3 EGO=0.45 python -m carla2real.postprocessing.car_lights_from \
+  lamps.mp4 v93n.mp4 <label_dir> v97nL30f.mp4
 ```
 
-AlpaSim plan agreement over five night towns: 1.18 (v93n 1.15). The previous night baseline was **v93n**, chosen by eye over v79. It is the first model trained from random
+AlpaSim plan agreement over five night towns: 1.18 (v93n 1.15). The previous night baselines were v97nL30d and, before it, **v93n** (chosen by eye over v79). It is the first model trained from random
 initialisation on licensed data only, so its weights can be published. It scores lower on CIPO than
 v79, mostly on one town (Town04, a motorcyclist rendered too dark); longer-trained versions of it
 (v95n, v96n) reach 0.84 but were not preferred visually.
