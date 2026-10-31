@@ -170,13 +170,17 @@ Measured with an external perception stack against CARLA ground truth, over five
 each. CIPO recall is how reliably the closest in-path object is detected; lane error is lateral
 position accuracy.
 
-**Real-trained perception works better on our video than on CARLA itself.** The same perception stack,
+**In daylight, real-trained perception works much better on our video than on CARLA itself.** The same perception stack,
 trained on real cameras, run on the raw simulator frames of the same drives:
 
 | | Raw CARLA | carla2real | |
 |---|---:|---:|---|
-| ☀️ Daylight CIPO recall | 0.588 | **0.871** (v98fnb) | Town04: 0.15 → 0.98 |
-| 🌙 Night CIPO recall | 0.822 | **0.864** (v97nL30f) | |
+| ☀️ Daylight CIPO recall | 0.546 | **0.871** (v98fnb) | Town04: 0.12 → 0.98 |
+| 🌙 Night CIPO recall | **0.885** | 0.864 (v97nL30f) | raw CARLA is slightly ahead at night |
+| 💥 Crash scenarios (4) | 0.18 / 0.12 / 0.25 / 0.17 | **0.54 / 0.22 / 0.94 / 0.86** | rear-end / cut-in / car flipping ahead / ego flipping |
+
+*Correction (2026-11-01): an earlier version of this table reported raw CARLA at 0.588 (day) and 0.822 (night). Those raw
+clips had their red and blue channels swapped; the numbers above are re-measured on correctly coloured clips.*
 
 **Priority.** Vision Pilot detection is the main target. The driving policy below is used as an accuracy check: its plan
 is scored against the path the car actually drove, not against its plan on raw CARLA (that comparison makes raw CARLA
