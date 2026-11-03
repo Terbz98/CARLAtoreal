@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">How carla2real works</title>
+  <desc id="desc">A CARLA scenario provides semantic labels plus depth, edges, surface normals and lighting. A pix2pixHD generator turns them into an image. Finishing passes take vehicle paint, signs and shadows from CARLA and steady the distant buildings. The result is 1920 by 960 video that a perception stack can be scored on.</desc>
+  <rect width="1200" height="300" rx="20" fill="#0f1419"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <g id="s1"><rect x="32" y="56" width="250" height="188" rx="14" fill="#161d24" stroke="#2b333c" stroke-width="2"/>
+      <text x="56" y="100" font-size="24" font-weight="700" fill="#eceae8">1 · CARLA</text>
+      <text x="56" y="140" font-size="20" fill="#c9cdd2">drive any scenario:</text>
+      <text x="56" y="170" font-size="20" fill="#c9cdd2">town, weather, traffic,</text>
+      <text x="56" y="200" font-size="20" fill="#c9cdd2">crashes</text></g>
+    <g id="s2"><rect x="322" y="56" width="250" height="188" rx="14" fill="#161d24" stroke="#2b333c" stroke-width="2"/>
+      <text x="346" y="100" font-size="24" font-weight="700" fill="#eceae8">2 · Inputs</text>
+      <text x="346" y="140" font-size="20" fill="#c9cdd2">labels + depth,</text>
+      <text x="346" y="170" font-size="20" fill="#c9cdd2">edges, normals,</text>
+      <text x="346" y="200" font-size="20" fill="#c9cdd2">lighting</text></g>
+    <g id="s3"><rect x="612" y="56" width="250" height="188" rx="14" fill="#1d1a10" stroke="#f2c94c" stroke-width="2"/>
+      <text x="636" y="100" font-size="24" font-weight="700" fill="#f2c94c">3 · Generator</text>
+      <text x="636" y="140" font-size="20" fill="#c9cdd2">pix2pixHD trained</text>
+      <text x="636" y="170" font-size="20" fill="#c9cdd2">on licensed real</text>
+      <text x="636" y="200" font-size="20" fill="#c9cdd2">driving photos</text></g>
+    <g id="s4"><rect x="902" y="56" width="266" height="188" rx="14" fill="#161d24" stroke="#2b333c" stroke-width="2"/>
+      <text x="926" y="100" font-size="24" font-weight="700" fill="#eceae8">4 · Finishing</text>
+      <text x="926" y="140" font-size="20" fill="#c9cdd2">car paint, signs and</text>
+      <text x="926" y="170" font-size="20" fill="#c9cdd2">shadows from CARLA;</text>
+      <text x="926" y="200" font-size="20" fill="#c9cdd2">steady buildings</text></g>
+  </g>
+  <g fill="#f2c94c"><polygon points="314,150 292,140 292,160"/><polygon points="604,150 582,140 582,160"/><polygon points="894,150 872,140 872,160"/></g>
+  <g fill="none" stroke="#f2c94c" stroke-width="3"><line x1="282" y1="150" x2="296" y2="150"/><line x1="572" y1="150" x2="586" y2="150"/><line x1="862" y1="150" x2="876" y2="150"/></g>
+  <text x="600" y="282" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#8a939e">→ 1920×960 video, scored by a perception stack against CARLA's ground truth</text>
+</svg>

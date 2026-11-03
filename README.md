@@ -1,55 +1,74 @@
-<div align="center">
+<p align="center">
+  <img src="assets/readme/hero.svg" width="100%" alt="carla2real: author a driving scenario in CARLA, get video a camera-trained perception stack treats like a real feed">
+</p>
 
-# carla2real
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Code-Apache_2.0-blue.svg" alt="Code licence: Apache 2.0"></a>
+  <a href="weights/LICENSE"><img src="https://img.shields.io/badge/Weights-CC_BY--SA_4.0-orange.svg" alt="Weights licence: CC BY-SA 4.0"></a>
+  <a href="#weight-provenance"><img src="https://img.shields.io/badge/Fine--tuning_data-openly_licensed-yellow.svg" alt="Fine-tuning data: openly licensed"></a>
+  <a href="https://carla.org"><img src="https://img.shields.io/badge/CARLA-0.9.16-lightgrey.svg" alt="CARLA 0.9.16"></a>
+</p>
 
-**Turn CARLA simulation into photorealistic driving video, for testing perception systems.**
+<p align="center">
+  <img src="assets/readme/proof.jpg" width="100%" alt="Three scenes, raw CARLA on the left and carla2real on the right: daylight in Town10HD, night in Town10HD, and a car flipping over ahead in a crash scenario">
+</p>
 
-[![License](https://img.shields.io/badge/Code-Apache_2.0-blue.svg)](LICENSE)
-[![Weights](https://img.shields.io/badge/Weights-CC_BY--SA_4.0-orange.svg)](weights/LICENSE)
-[![Data](https://img.shields.io/badge/Fine--tuning_data-openly_licensed-yellow.svg)](#weight-provenance)
-[![CARLA](https://img.shields.io/badge/CARLA-0.9.16-lightgrey.svg)](https://carla.org)
+<p align="center"><img src="media/demo_sunny.gif" width="100%" alt="Animated: the same drive in CARLA (left) and rendered by carla2real (right)"></p>
+<p align="center"><i>Same drive, same camera, same traffic. Left: CARLA. Right: carla2real.</i></p>
 
-</div>
+## What it is
 
-<img src="media/demo_sunny.gif" width="100%">
+Perception systems need testing on rare, dangerous scenarios: a car braking hard ahead, a vehicle cutting in, a car
+flipping over. Those are cheap to **author** in a simulator and expensive or impossible to **film** on a real road.
+But simulator footage doesn't look real, so a perception model trained on real cameras fails on it for the wrong
+reasons. carla2real renders any CARLA scenario as camera-like video, so the perception stack is tested on the scenario
+and not on the look of the simulator.
 
-<div align="center"><i>Left: CARLA. Right: the same drive, rendered photorealistic. Same camera, same traffic.</i></div>
+## Why it is different
 
-## Why this exists
+- **The simulator pins the world down.** A label map says "building" but not *which* building, so a plain
+  label-to-image model invents a new facade every frame. carla2real also feeds the generator CARLA's depth, edges,
+  surface normals and lighting, so the scene stays the same from frame to frame.
+- **It takes from CARLA what the labels cannot say.** Finishing passes copy each car's real paint and markings, the
+  traffic-sign faces and the ground shadows from the simulator, and steady the distant buildings.
+- **It is measured, not eyeballed.** Every model is scored with a camera-trained perception stack against CARLA's
+  ground truth, and checked with a real-world driving policy.
+- **Openly licensed fine-tuning data.** The current models are fine-tuned on PandaSet and the Zenseact Open Dataset
+  only. Their starting weights are older; see [weight provenance](#weight-provenance).
 
-Perception systems need to be tested on rare and dangerous scenarios: a child stepping out from
-behind a parked van, a car braking hard in fog at night. Those are cheap to *author* in a simulator
-and expensive or impossible to *film* on a real road.
+## Results
 
-The problem is that simulator footage doesn't look real, so a perception model trained on real
-video often fails on it for the wrong reasons. **carla2real closes that gap**: you author the
-scenario in CARLA, and get video a perception stack treats like a real camera feed.
+<p align="center">
+  <img src="assets/readme/results.svg" width="100%" alt="Bar chart of lead-vehicle detection, raw CARLA vs carla2real; the same numbers are in the table below">
+</p>
 
-## What it does
+Measured with an external perception stack against CARLA ground truth, five towns of 1000 frames each, plus four
+scripted crash scenarios. CIPO recall is how reliably the closest in-path object is detected (higher is better).
 
-- 🎥 **Photorealistic video from any CARLA scenario.** Any town, weather, traffic, time of day
-- 🌞🌙 **Two dedicated models.** One for daylight, one for night
-- 📊 **Measurable.** Scored against ground truth using an external perception stack
-- ⚖️ **Openly licensed fine-tuning data.** The current models are fine-tuned on PandaSet and the
-  Zenseact Open Dataset only. Their starting weights are older, though; see
-  [Weight provenance](#weight-provenance)
-- 🎯 **Stable, not flickery.** The usual failure of frame-by-frame generation is that every frame
-  invents a slightly different world; extra depth, edge and lighting inputs pin it down
+| | Raw CARLA | carla2real | |
+|---|---:|---:|---|
+| ☀️ Daylight CIPO recall | 0.546 | **0.879** (v98scvs) | Town04: 0.12 → 0.995 |
+| 🌙 Night CIPO recall | **0.885** | 0.880 (v97nL30fL) | raw CARLA is slightly ahead at night |
+| 💥 Crash scenarios (4) | 0.18 / 0.12 / 0.25 / 0.17 | **0.54 / 0.22 / 0.94 / 0.86** | rear-end / cut-in / car flipping ahead / ego flipping |
+
+*Correction (2026-11-01): an earlier version of this table reported raw CARLA at 0.588 (day) and 0.822 (night). Those
+raw clips had their red and blue channels swapped; the numbers above are re-measured on correctly coloured clips.*
+
+**A real-world driving policy behaves on our video more like it does on real footage.** VaVAM (see
+[`alpasim/`](alpasim/)) on 103 real PandaSet drives plans about 78% of the distance actually driven over the next 3 s.
+On raw CARLA it plans only 64% (far more cautious, treating the simulator as unfamiliar); on carla2real daylight 70%.
+The policy is used as an accuracy check: its plan is scored against the path the car actually drove, not against its
+plan on raw CARLA, which would make raw CARLA perfect by definition.
+
+**Video compression matters.** Each post-processing stage re-encodes the clip; with lossy mp4v at every stage, Town03
+detection fell from 0.937 to 0.911 after a single extra re-encode. Set `FOURCC=FFV1` to make every stage lossless
+(`carla2real/common/vidcodec.py`).
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A[CARLA<br/>drive a scenario] --> B[Semantic labels<br/>+ depth, edges, normals]
-    B --> C[pix2pixHD<br/>generator]
-    C --> D[Post-processing<br/>stability, colour, shadows]
-    D --> E[Photorealistic<br/>1920x960 video]
-```
-
-The generator turns a semantic label map (*road here, car there*) into an image. On its own that
-isn't enough: a label map says "building" but not *which* building, so the model invents a different
-facade every frame and the video shimmers. Feeding it depth, edges, surface normals and lighting
-from the simulator pins the world down so it stays the same from frame to frame.
+<p align="center">
+  <img src="assets/readme/pipeline.svg" width="100%" alt="Pipeline: CARLA scenario, then labels plus depth, edges, normals and lighting, then the pix2pixHD generator, then finishing passes, giving 1920x960 video scored by a perception stack">
+</p>
 
 ## Getting started
 
@@ -62,26 +81,20 @@ Requires [CARLA 0.9.16](https://carla.org) and Python 3.10+, with an NVIDIA GPU 
 git clone https://github.com/Terbz98/CARLAtoreal.git
 cd CARLAtoreal
 pip install -r requirements.txt
-```
-
-Create the data directories:
-
-```bash
 python3 scripts/init_asset_dirs.py
 ```
 
-Bulk data lives outside the repository. Either accept the defaults (`./datasets`, `./output`) or
-point `CARLA2REAL_DATA` and `CARLA2REAL_OUT` somewhere with space. A five-town run is tens of GB.
+Bulk data lives outside the repository. Either accept the defaults (`./datasets`, `./output`) or point
+`CARLA2REAL_DATA` and `CARLA2REAL_OUT` somewhere with space. A five-town run is tens of GB.
 
 </details>
 
 <details>
 <summary><b>Step 2. Get the model weights</b></summary>
 
-Weights are **not published yet**. The current checkpoints descend from earlier models that were
-trained on research-only data (see [Weight provenance](#weight-provenance)), so they will be released
-only once a from-scratch, licensed-only model replaces them. When they are, they ship as release
-assets (350 MB each), not committed files:
+Weights are **not published yet**. The current checkpoints descend from earlier models that were trained on
+research-only data (see [weight provenance](#weight-provenance)), so they will be released only once a from-scratch,
+licensed-only model replaces them. When they are, they ship as release assets (350 MB each), not committed files:
 
 ```bash
 bash scripts/weights/fetch.sh
@@ -94,8 +107,6 @@ They are licensed **CC BY-SA 4.0**, which is different from the code. See [`weig
 <details>
 <summary><b>Step 3. Record a scenario in CARLA</b></summary>
 
-Start the simulator, then drive a town on autopilot while capturing camera and semantic output:
-
 ```bash
 # start CARLA (headless)
 ~/carla/CARLA_0.9.16/CarlaUE4.sh -RenderOffScreen -world-port=2000 &
@@ -105,8 +116,7 @@ python3 -m carla2real.recording.record_town_auto \
   --town Town05 --weather sunny --outname Town05_sunny_inst
 ```
 
-This writes RGB frames, semantic labels and a speed log to
-`$CARLA2REAL_DATA/recorded_Town05_sunny_inst/`.
+This writes RGB frames, semantic labels and a speed log to `$CARLA2REAL_DATA/recorded_Town05_sunny_inst/`.
 
 </details>
 
@@ -152,48 +162,18 @@ The finished 1920×960 video lands in `$CARLA2REAL_OUT/`.
 <details>
 <summary><b>Step 5 (optional). Score it against ground truth</b></summary>
 
-If you have a perception stack, point `PERCEPTION_ROOT` at it and compare its output on the
-generated video against CARLA's ground truth:
+If you have a perception stack, point `PERCEPTION_ROOT` at it and compare its output on the generated video against
+CARLA's ground truth:
 
 ```bash
 python3 -m carla2real.evaluation.score_vp <gt.json> <perception.log> --json out.json
 ```
 
-Feed it **1024×512**, not the full 1920×960. Lateral accuracy is several times worse at the
-larger size.
+Feed it **1024×512**, not the full 1920×960. Lateral accuracy is several times worse at the larger size.
 
 </details>
 
-## Results
-
-Measured with an external perception stack against CARLA ground truth, over five towns of 1000 frames
-each. CIPO recall is how reliably the closest in-path object is detected; lane error is lateral
-position accuracy.
-
-**In daylight, real-trained perception works much better on our video than on CARLA itself.** The same perception stack,
-trained on real cameras, run on the raw simulator frames of the same drives:
-
-| | Raw CARLA | carla2real | |
-|---|---:|---:|---|
-| ☀️ Daylight CIPO recall | 0.546 | **0.879** (v98scvs) | Town04: 0.12 → 0.995 |
-| 🌙 Night CIPO recall | **0.885** | 0.880 (v97nL30fL) | raw CARLA is slightly ahead at night |
-| 💥 Crash scenarios (4) | 0.18 / 0.12 / 0.25 / 0.17 | **0.54 / 0.22 / 0.94 / 0.86** | rear-end / cut-in / car flipping ahead / ego flipping |
-
-*Correction (2026-11-01): an earlier version of this table reported raw CARLA at 0.588 (day) and 0.822 (night). Those raw
-clips had their red and blue channels swapped; the numbers above are re-measured on correctly coloured clips.*
-
-**Priority.** Vision Pilot detection is the main target. The driving policy below is used as an accuracy check: its plan
-is scored against the path the car actually drove, not against its plan on raw CARLA (that comparison makes raw CARLA
-perfect by definition).
-
-**Video compression matters.** Each post-processing stage re-encodes the clip; with lossy mp4v at every stage, Town03
-detection fell from 0.937 to 0.911 after a single extra re-encode. Set `FOURCC=FFV1` to make every stage lossless
-(`carla2real/common/vidcodec.py`).
-
-**A real-world driving policy behaves on our video more like it does on real footage.** VaVAM (see
-[`alpasim/`](alpasim/)) on 103 real PandaSet drives plans about 78% of the distance actually driven
-over the next 3 s. On raw CARLA it plans only 64% (it is far more cautious, treating the simulator as
-unfamiliar); on carla2real daylight 70%.
+## Models
 
 | Condition | Model | CIPO recall ↑ | Lane error ↓ | Training data |
 |---|---|---|---|---|
@@ -205,6 +185,9 @@ unfamiliar); on carla2real daylight 70%.
 | 🌙 Night, previous | v97nL30f | 0.864 | 0.230 m | v93n fine-tuned with warm-lamp PandaSet + ZOD frames |
 | 🌙 Night, older | v93n | 0.710 | 0.221 m | PandaSet + ZOD (**trained from scratch**, weights published) |
 | 🌙 Night, older | v79 | **0.888** | 0.226 m | PandaSet + ZOD (fine-tuned, not published) |
+
+<details>
+<summary><b>How the daylight and night baselines were chosen</b></summary>
 
 The daylight baseline is **v98scvs** (2026-11-03), chosen by eye. It adds **temporal self-consistency**: v98 is
 fine-tuned (two epochs, licensed PandaSet video, 82 daytime scenes) with an extra penalty wherever its frame differs from
@@ -244,6 +227,8 @@ initialisation on licensed data only, so its weights can be published. It scores
 v79, mostly on one town (Town04, a motorcyclist rendered too dark); longer-trained versions of it
 (v95n, v96n) reach 0.84 but were not preferred visually.
 
+</details>
+
 ## Licensing at a glance
 
 | | Licence | Commercial use |
@@ -252,25 +237,25 @@ v79, mostly on one town (Town04, a motorcyclist rendered too dark); longer-train
 | Model weights | CC BY-SA 4.0 | ✅ with share-alike |
 | Training data | [PandaSet](https://pandaset.org) CC BY 4.0 · [ZOD](https://zod.zenseact.com) CC BY-SA 4.0 | ✅ |
 
-Weights are share-alike because ZOD is, and trained weights are treated as a derivative of their
-training data. Full detail in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+Weights are share-alike because ZOD is, and trained weights are treated as a derivative of their training data. Full
+detail in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ### Weight provenance
 
-The **night** baseline v93n was trained from random initialisation on PandaSet and ZOD only, and its
-fp16 weights are published as a release asset (`scripts/weights/fetch.sh`). The **daylight** baseline
-is fine-tuned, not trained from scratch. Its final training data is PandaSet and ZOD only, but its
-starting weights come from a chain of earlier checkpoints:
+The **night** model v93n was trained from random initialisation on PandaSet and ZOD only, and its fp16 weights are
+published as a release asset (`scripts/weights/fetch.sh`). The **daylight** baseline is fine-tuned, not trained from
+scratch. Its final training data is PandaSet and ZOD only, but its starting weights come from a chain of earlier
+checkpoints:
 
-- **Daylight** v90 descends from v75, v73 and v50, which trained on Mapillary Vistas
-  (non-commercial), Cityscapes (research only) and driving video whose licence was never established.
-- The previous night baseline v79 descends from v76, v69, v51 and v47, which trained on Dark Zurich
-  and night driving video of the same unestablished provenance.
+- **Daylight** v90 descends from v75, v73 and v50, which trained on Mapillary Vistas (non-commercial), Cityscapes
+  (research only) and driving video whose licence was never established.
+- The previous night baseline v79 descends from v76, v69, v51 and v47, which trained on Dark Zurich and night driving
+  video of the same unestablished provenance.
 
-If trained weights count as a derivative of their training data, which is the reasoning this project
-already applies to ZOD's share-alike, then these checkpoints carry those restrictions. **For that
-reason they are not published.** A daylight model trained from scratch (v92c,
-`scripts/training/train_from_scratch_sunny.sh`) exists and is about one CIPO point behind v90dv.
+If trained weights count as a derivative of their training data, which is the reasoning this project already applies
+to ZOD's share-alike, then these checkpoints carry those restrictions. **For that reason they are not published.** A
+daylight model trained from scratch (v92c, `scripts/training/train_from_scratch_sunny.sh`) exists and is about one
+CIPO point behind v90dv.
 
 ## Documentation
 
@@ -282,12 +267,12 @@ reason they are not published.** A daylight model trained from scratch (v92c,
 | [Datasets](datasets/README.md) | Training corpora, download links and licences |
 | [Experiment history](docs/EXPERIMENTS.md) | What was tried, what failed, and why |
 
-> **Status:** this is a research project, not a packaged product. The commands above are the
-> documented recipes; some preprocessing stages are still being reconnected after a restructure.
-> See the [inference flow audit](docs/INFERENCE_FLOW.md) for exactly which.
+> **Status:** this is a research project, not a packaged product. The commands above are the documented recipes; some
+> preprocessing stages are still being reconnected after a restructure. See the
+> [inference flow audit](docs/INFERENCE_FLOW.md) for exactly which.
 
 ## Acknowledgements
 
 Built on [pix2pixHD](https://github.com/NVIDIA/pix2pixHD) (NVIDIA), [CARLA](https://carla.org),
-[Mask2Former](https://github.com/facebookresearch/Mask2Former) and
-[MoGe](https://github.com/microsoft/MoGe). Developed at ITRI.
+[Mask2Former](https://github.com/facebookresearch/Mask2Former) and [MoGe](https://github.com/microsoft/MoGe).
+Developed at ITRI.

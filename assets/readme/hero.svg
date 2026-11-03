@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="390" viewBox="0 0 1200 390" role="img" aria-labelledby="title desc">
+  <title id="title">carla2real</title>
+  <desc id="desc">carla2real turns CARLA simulator scenarios into camera-like driving video for testing perception systems. A road scene drawn as CARLA semantic label colours on the left of a seam becomes realistic tones on the right.</desc>
+  <defs>
+    <clipPath id="frame"><rect x="640" y="64" width="512" height="256" rx="14"/></clipPath>
+    <clipPath id="labelside"><rect x="640" y="64" width="256" height="256"/></clipPath>
+    <clipPath id="realside"><rect x="896" y="64" width="256" height="256"/></clipPath>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fb7c9"/><stop offset="1" stop-color="#d5dde2"/></linearGradient>
+    <linearGradient id="asphalt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a4d50"/><stop offset="1" stop-color="#2a2c2e"/></linearGradient>
+  </defs>
+
+  <rect width="1200" height="390" rx="20" fill="#0f1419"/>
+
+  <!-- left: category, name, promise, process -->
+  <g id="copy" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="56" y="92" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2" fill="#f2c94c">SIM-TO-REAL VIDEO · PERCEPTION TESTING</text>
+    <text x="52" y="176" font-size="84" font-weight="700" fill="#eceae8">carla2real</text>
+    <text x="56" y="226" font-size="24" fill="#c9cdd2">Author a driving scenario in CARLA.</text>
+    <text x="56" y="260" font-size="24" fill="#c9cdd2">Get video a camera-trained perception</text>
+    <text x="56" y="294" font-size="24" fill="#c9cdd2">stack treats like a real feed.</text>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#8a939e">
+      <text x="56" y="362">labels · depth · edges  →  pix2pixHD  →  1920×960 video</text>
+    </g>
+  </g>
+
+  <!-- right: one road scene, CARLA labels on the left of the seam, camera tones on the right -->
+  <g id="scene" clip-path="url(#frame)">
+    <!-- label side -->
+    <g clip-path="url(#labelside)">
+      <rect x="640" y="64" width="512" height="110" fill="#4682b4"/>
+      <rect x="640" y="104" width="120" height="96" fill="#464646"/>
+      <rect x="760" y="122" width="70" height="78" fill="#464646"/>
+      <circle cx="850" cy="160" r="34" fill="#6b8e23"/>
+      <rect x="640" y="198" width="512" height="122" fill="#f423e8"/>
+      <polygon points="640,320 1152,320 960,200 832,200" fill="#804080"/>
+      <polygon points="893,208 899,208 905,320 887,320" fill="#9d9d4e"/>
+      <rect x="860" y="236" width="76" height="44" rx="6" fill="#00008e"/>
+    </g>
+    <!-- camera side -->
+    <g clip-path="url(#realside)">
+      <rect x="640" y="64" width="512" height="110" fill="url(#sky)"/>
+      <rect x="1060" y="96" width="92" height="104" fill="#8d8a84"/>
+      <rect x="1000" y="124" width="62" height="76" fill="#a39f97"/>
+      <circle cx="960" cy="156" r="36" fill="#55663a"/>
+      <circle cx="984" cy="170" r="22" fill="#46552f"/>
+      <rect x="640" y="198" width="512" height="122" fill="#7a7874"/>
+      <polygon points="640,320 1152,320 960,200 832,200" fill="url(#asphalt)"/>
+      <polygon points="893,208 899,208 905,320 887,320" fill="#e9e7df"/>
+      <rect x="860" y="236" width="76" height="44" rx="6" fill="#1c2733"/>
+      <rect x="866" y="242" width="64" height="12" rx="3" fill="#2f3e4e"/>
+      <rect x="866" y="266" width="10" height="6" rx="2" fill="#c23b32"/>
+      <rect x="920" y="266" width="10" height="6" rx="2" fill="#c23b32"/>
+    </g>
+  </g>
+  <rect x="640" y="64" width="512" height="256" rx="14" fill="none" stroke="#2b333c" stroke-width="2"/>
+  <!-- the seam -->
+  <line x1="896" y1="52" x2="896" y2="332" stroke="#f2c94c" stroke-width="3"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">
+    <text x="652" y="356" fill="#8a939e">CARLA labels</text>
+    <text x="1140" y="356" fill="#f2c94c" text-anchor="end">camera-like</text>
+  </g>
+</svg>
