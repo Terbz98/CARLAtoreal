@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/readme/proof.jpg" width="100%" alt="Three scenes, raw CARLA on the left and carla2real on the right: daylight in Town10HD, night in Town10HD, and a car flipping over ahead in a crash scenario">
+  <img src="assets/readme/proof.jpg" width="100%" alt="Raw CARLA on the left and carla2real on the right: daylight in Town10HD and night in Town10HD">
 </p>
 
 <p align="center"><img src="media/demo_sunny.gif" width="100%" alt="Animated: the same drive in CARLA (left) and rendered by carla2real (right)"></p>
