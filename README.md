@@ -175,8 +175,8 @@ trained on real cameras, run on the raw simulator frames of the same drives:
 
 | | Raw CARLA | carla2real | |
 |---|---:|---:|---|
-| ☀️ Daylight CIPO recall | 0.546 | **0.871** (v98fnb) | Town04: 0.12 → 0.98 |
-| 🌙 Night CIPO recall | **0.885** | 0.864 (v97nL30f) | raw CARLA is slightly ahead at night |
+| ☀️ Daylight CIPO recall | 0.546 | **0.879** (v98scvs) | Town04: 0.12 → 0.995 |
+| 🌙 Night CIPO recall | **0.885** | 0.880 (v97nL30fL) | raw CARLA is slightly ahead at night |
 | 💥 Crash scenarios (4) | 0.18 / 0.12 / 0.25 / 0.17 | **0.54 / 0.22 / 0.94 / 0.86** | rear-end / cut-in / car flipping ahead / ego flipping |
 
 *Correction (2026-11-01): an earlier version of this table reported raw CARLA at 0.588 (day) and 0.822 (night). Those raw
@@ -197,14 +197,24 @@ unfamiliar); on carla2real daylight 70%.
 
 | Condition | Model | CIPO recall ↑ | Lane error ↓ | Training data |
 |---|---|---|---|---|
-| ☀️ Daylight | **v98f** | 0.869 | 0.201 m | PandaSet + ZOD + ZOD nature frames (fine-tuned) |
-| ☀️ Daylight, previous | v90dv | 0.877 | 0.197 m | PandaSet + ZOD (fine-tuned) |
+| ☀️ Daylight | **v98scvs** | **0.879** | 0.195 m | v98 + temporal self-consistency on PandaSet sequences |
+| ☀️ Daylight, previous | v98f | 0.869 | 0.201 m | PandaSet + ZOD + ZOD nature frames (fine-tuned) |
+| ☀️ Daylight, older | v90dv | 0.877 | 0.197 m | PandaSet + ZOD (fine-tuned) |
 | ☀️ Daylight, no vehicle pass | v90d | **0.894** | 0.191 m | PandaSet + ZOD (fine-tuned) |
-| 🌙 Night | **v97nL30f** | 0.864 | 0.230 m | v93n fine-tuned with warm-lamp PandaSet + ZOD frames |
-| 🌙 Night, previous | v93n | 0.710 | 0.221 m | PandaSet + ZOD (**trained from scratch**, weights published) |
+| 🌙 Night | **v97nL30fL** | 0.880 | 0.223 m | v97nL30f, every stage saved lossless |
+| 🌙 Night, previous | v97nL30f | 0.864 | 0.230 m | v93n fine-tuned with warm-lamp PandaSet + ZOD frames |
+| 🌙 Night, older | v93n | 0.710 | 0.221 m | PandaSet + ZOD (**trained from scratch**, weights published) |
 | 🌙 Night, older | v79 | **0.888** | 0.226 m | PandaSet + ZOD (fine-tuned, not published) |
 
-The daylight baseline is **v98f** (2026-10-15), chosen by eye: v90 fine-tuned with 2,296 extra green, leafy ZOD frames,
+The daylight baseline is **v98scvs** (2026-11-03), chosen by eye. It adds **temporal self-consistency**: v98 is
+fine-tuned (two epochs, licensed PandaSet video, 82 daytime scenes) with an extra penalty wherever its frame differs from
+its own previous frame warped by optical flow. The generator stays single-frame (it never sees its own output, so none
+of the ghosting of earlier temporal models). It is rendered losslessly through the colour-keeping chain below, with
+distant buildings steadied using CARLA's own motion. Against the previous output (v98fnb), building flicker halves (4.73 → 2.44 vs
+CARLA's 1.22) and detection rises (0.871 → 0.879). Train it with `--self_consistency --lambda_temporal 10` on a corpus
+built by `scripts/training/build_temporal_pandaset.py`.
+
+The previous daylight baseline was **v98f** (2026-10-15), chosen by eye: v90 fine-tuned with 2,296 extra green, leafy ZOD frames,
 rendered from tree-softened CARLA geometry, with CARLA sign faces, halo-free vehicle edges and stabilised distant
 facades. A real-world driving policy (VaVAM, see [`alpasim/`](alpasim/)) plans more like it does on raw CARLA on v98
 than on v90 (five-town plan agreement 1.28 vs 1.30). The previous baseline was **v90dv**. The vehicle pass restores what the label map never
@@ -217,7 +227,7 @@ being compared against what CARLA knows was actually there.
 v90 is fine-tuned on PandaSet (all three forward cameras, daylight frames only, colour-matched) and
 10,000 ZOD frames.
 
-The night baseline is **v97nL30f** (2026-10-29), chosen by eye: the v97n model (v93n fine-tuned with 5,735 licensed
+The night baseline is **v97nL30fL** (2026-11-03): the v97nL30f recipe below with every stage written lossless (`FOURCC=FFV1`), which lifts night detection from 0.864 to 0.880. v97nL30f (2026-10-29) was chosen by eye: the v97n model (v93n fine-tuned with 5,735 licensed
 frames of warm sodium street lighting), then a sodium tint only where CARLA's street lamps light the scene (building
 fronts at about a third of it, lane markings and vehicles excluded), with vehicle lamps and the light they throw onto
 the road taken from v93n so they stay white, while each car body keeps its own colour. Commands:

@@ -7,7 +7,7 @@ def CreateDataset(opt):
     if getattr(opt, 'multiframe', False):
         from data.multiframe_dataset import MultiframeDataset
         dataset = MultiframeDataset()
-    elif getattr(opt, 'temporal', False) and opt.isTrain:
+    elif (getattr(opt, 'temporal', False) or getattr(opt, 'self_consistency', False)) and opt.isTrain:
         from data.temporal_dataset import TemporalDataset
         dataset = TemporalDataset()
     else:

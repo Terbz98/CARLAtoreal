@@ -57,6 +57,14 @@ class Pix2PixHDModel(BaseModel):
             netG_input_nc += 3
         if getattr(opt, 'normal_input', False):
             netG_input_nc += 3
+        # roughness prior, counted last to match encode_input's concat order -- the two MUST agree
+        # or load_network silently drops the first conv to random init
+        if getattr(opt, 'texture_input', False):
+            netG_input_nc += 1
+        # ground-shadow prior, counted after the roughness prior for the same reason: last in, so a
+        # 74ch parent grafts into a 75ch first conv as a pure widen
+        if getattr(opt, 'shadow_input', False):
+            netG_input_nc += 1
         if getattr(opt, 'temporal', False):
             netG_input_nc += opt.output_nc   # previous frame (3ch) concatenated for G only
         if getattr(opt, 'multiframe', False):
@@ -86,6 +94,13 @@ class Pix2PixHDModel(BaseModel):
                 netD_input_nc += 3
             if getattr(opt, 'normal_input', False):
                 netD_input_nc += 3
+            # D sees the same conditioning stack as G, so the roughness channel must be counted here
+            # too. Missing it is not a silent mismatch -- D is built one channel narrow and the
+            # forward pass raises "expected input to have 76 channels, but got 77".
+            if getattr(opt, 'texture_input', False):
+                netD_input_nc += 1
+            if getattr(opt, 'shadow_input', False):
+                netD_input_nc += 1
             if not opt.no_instance:
                 netD_input_nc += 1
             self.netD = networks.define_D(netD_input_nc, opt.ndf, opt.n_layers_D, opt.norm, use_sigmoid,
@@ -122,7 +137,7 @@ class Pix2PixHDModel(BaseModel):
             self.old_lr = opt.lr
 
             # define loss functions
-            self.loss_filter = self.init_loss_filter(not opt.no_ganFeat_loss, not opt.no_vgg_loss, getattr(opt, 'temporal', False), getattr(opt, 'video_disc', False))
+            self.loss_filter = self.init_loss_filter(not opt.no_ganFeat_loss, not opt.no_vgg_loss, getattr(opt, 'temporal', False) or getattr(opt, 'self_consistency', False), getattr(opt, 'video_disc', False))
             
             self.criterionGAN = networks.GANLoss(use_lsgan=not opt.no_lsgan, tensor=self.Tensor)   
             self.criterionFeat = torch.nn.L1Loss()
@@ -163,7 +178,7 @@ class Pix2PixHDModel(BaseModel):
                 params += list(self.netD_V.parameters())
             self.optimizer_D = torch.optim.Adam(params, lr=opt.lr, betas=(opt.beta1, 0.999))
 
-    def encode_input(self, label_map, inst_map=None, real_image=None, feat_map=None, infer=False, weather_id=None, edge_map=None, depth_map=None, normal_map=None, light_map=None, chroma_map=None):
+    def encode_input(self, label_map, inst_map=None, real_image=None, feat_map=None, infer=False, weather_id=None, edge_map=None, depth_map=None, normal_map=None, light_map=None, chroma_map=None, texture_map=None, shadow_map=None):
         if self.opt.label_nc == 0:
             input_label = label_map.data.cuda()
         else:
@@ -219,6 +234,23 @@ class Pix2PixHDModel(BaseModel):
                 normal_in = normal_in.unsqueeze(0)
             input_label = torch.cat([input_label, normal_in.to(input_label.dtype)], dim=1)
 
+        # append the roughness prior (1ch in [0,1]). LAST on purpose: every existing channel keeps
+        # its index, so grafting a 73ch checkpoint into a 74ch first conv is a pure widen and the
+        # parent's weights land where they already were.
+        if getattr(self.opt, 'texture_input', False) and texture_map is not None:
+            tex_in = texture_map.data.cuda().float()
+            if tex_in.dim() == 3:
+                tex_in = tex_in.unsqueeze(1)
+            input_label = torch.cat([input_label, tex_in.to(input_label.dtype)], dim=1)
+
+        # append the ground-shadow prior (1ch in [0,1]), after the roughness prior and for the same
+        # reason -- appending keeps every earlier channel at the index the parent learned it at.
+        if getattr(self.opt, 'shadow_input', False) and shadow_map is not None:
+            sh_in = shadow_map.data.cuda().float()
+            if sh_in.dim() == 3:
+                sh_in = sh_in.unsqueeze(1)
+            input_label = torch.cat([input_label, sh_in.to(input_label.dtype)], dim=1)
+
         # get edges from instance map
         if not self.opt.no_instance:
             inst_map = inst_map.data.cuda()
@@ -263,9 +295,10 @@ class Pix2PixHDModel(BaseModel):
             return self.netD.forward(input_concat)
 
     def forward(self, label, inst, image, feat, infer=False, weather=None, edge=None, prev=None, flow=None,
-                mf_labels=None, mf_edges=None, depth=None, normal=None, light=None, chroma=None):
+                mf_labels=None, mf_edges=None, depth=None, normal=None, light=None, chroma=None,
+                prev_cond=None, texture=None, shadow=None):
         # Encode Inputs
-        input_label, inst_map, real_image, feat_map = self.encode_input(label, inst, image, feat, weather_id=weather, edge_map=edge, depth_map=depth, normal_map=normal, light_map=light, chroma_map=chroma)
+        input_label, inst_map, real_image, feat_map = self.encode_input(label, inst, image, feat, weather_id=weather, edge_map=edge, depth_map=depth, normal_map=normal, light_map=light, chroma_map=chroma, texture_map=texture, shadow_map=shadow)
 
         # Fake Generation
         if self.use_features:
@@ -312,6 +345,46 @@ class Pix2PixHDModel(BaseModel):
                 r = torch.rand(1).item()
                 sc = 0.0 if r < 0.2 else (0.2 + 0.8 * torch.rand(1).item())
                 prev_in = prev * sc
+
+            # STUDENT FORCING. prev_aug above only rescales a REAL previous frame, so every
+            # example G has ever seen was clean. At inference it is handed its OWN previous
+            # output, whose errors it then amplifies -- measured as a woven crosshatch on flat
+            # surfaces, up to 8.65x parent road texture at prev_scale 1.0, which is why inference
+            # has to be damped to 0.5 and why the temporal models never beat the post-processed
+            # baseline. Damping treats the symptom. This trains on the real distribution: generate
+            # t-1 the way inference will, then learn to consume it.
+            #
+            # The inner pass gets a ZERO prev channel, which is exactly what frame 0 receives at
+            # inference, so the sample is a genuine one-step rollout rather than a hybrid. It runs
+            # under no_grad -- G is being trained to CONSUME its output, not to backpropagate
+            # through having produced it, and unrolling the graph would cost memory for a term
+            # that is already supervised by the frame-t loss.
+            if (self.isTrain and getattr(self.opt, 'student_forcing', 0) > 0
+                    and prev_cond and getattr(prev_cond.get('label'), 'dim', lambda: 0)() == 4
+                    and torch.rand(1).item() < self.opt.student_forcing):
+                with torch.no_grad():
+                    prev_label_in, _, _, _ = self.encode_input(
+                        prev_cond.get('label'), inst, None, feat, infer=True, weather_id=weather,
+                        edge_map=prev_cond.get('edge'), depth_map=prev_cond.get('depth'),
+                        normal_map=prev_cond.get('normal'), light_map=prev_cond.get('light'),
+                        chroma_map=prev_cond.get('chroma'), texture_map=prev_cond.get('texture'),
+                        shadow_map=prev_cond.get('shadow'))
+                    # A width mismatch means a conditioning channel was not supplied for t-1.
+                    # ABORT rather than fall back: a silent fallback would train for hours on the
+                    # real previous frame while the log claimed student forcing was on, and this
+                    # project has already lost a model to exactly that kind of quiet no-op.
+                    if prev_label_in.size(1) != input_concat.size(1):
+                        raise RuntimeError(
+                            f'student_forcing: t-1 conditioning is {prev_label_in.size(1)}ch but '
+                            f'the current frame is {input_concat.size(1)}ch. The dataset is not '
+                            f'supplying every channel the conditioning flags require.')
+                    prev_in = self.netG.forward(
+                        torch.cat((prev_label_in, torch.zeros_like(prev)), dim=1)).detach()
+                    if not getattr(self, '_sf_announced', False):
+                        self._sf_announced = True
+                        print(f'  STUDENT FORCING ACTIVE: G consuming its own t-1 '
+                              f'({prev_label_in.size(1)}ch conditioning), p={self.opt.student_forcing}',
+                              flush=True)
             input_concat = torch.cat((input_concat, prev_in), dim=1)
         fake_image = self.netG.forward(input_concat)
 
@@ -426,6 +499,37 @@ class Pix2PixHDModel(BaseModel):
             denom = occ.sum().clamp(min=1.0)
             loss_G_Temporal = (torch.abs(fake_image - warped_prev) * occ).sum() / denom * self.opt.lambda_temporal
 
+        # SELF-CONSISTENCY (2026-10-30): G stays single-frame; generate its own t-1 (no grad) and penalise frame t where it
+        # disagrees with that t-1 warped by the flow, on textured non-occluded pixels. Same gates as the temporal loss above.
+        if (getattr(self.opt, 'self_consistency', False) and prev_cond and flow is not None
+                and getattr(prev_cond.get('label'), 'dim', lambda: 0)() == 4):
+            import torch.nn.functional as _Fn
+            with torch.no_grad():
+                pin, _, _, _ = self.encode_input(
+                    prev_cond.get('label'), inst, None, feat, infer=True, weather_id=weather,
+                    edge_map=prev_cond.get('edge'), depth_map=prev_cond.get('depth'),
+                    normal_map=prev_cond.get('normal'), light_map=prev_cond.get('light'),
+                    chroma_map=prev_cond.get('chroma'), texture_map=prev_cond.get('texture'),
+                    shadow_map=prev_cond.get('shadow'))
+                if pin.size(1) != input_concat.size(1):
+                    raise RuntimeError(f'self_consistency: t-1 conditioning {pin.size(1)}ch vs current {input_concat.size(1)}ch')
+                fake_prev = self.netG.forward(pin).detach()
+            flow_c = flow.data.cuda().float()
+            warped = self.warp(fake_prev.float(), flow_c)
+            real_prev = prev.data.cuda().float() if prev is not None else None
+            occ = torch.ones_like(fake_image[:, :1]).float()
+            if real_prev is not None:   # occlusion from the REAL pair: where the real t-1 warped does not match real t
+                occ = (torch.abs(self.warp(real_prev, flow_c) - real_image.float()).mean(1, keepdim=True) < 0.15).float()
+            _g = real_image.mean(1, keepdim=True).float()
+            _gx = _Fn.pad((_g[:, :, :, 1:] - _g[:, :, :, :-1]).abs(), (0, 1, 0, 0))
+            _gy = _Fn.pad((_g[:, :, 1:, :] - _g[:, :, :-1, :]).abs(), (0, 0, 0, 1))
+            _tex = _Fn.avg_pool2d(_gx + _gy, 9, stride=1, padding=4)
+            occ = occ * (_tex > getattr(self.opt, 'temporal_tex_thresh', 0.02)).float()
+            loss_G_Temporal = (torch.abs(fake_image.float() - warped) * occ).sum() / occ.sum().clamp(min=1.0) * self.opt.lambda_temporal
+            if not getattr(self, '_sc_announced', False):
+                self._sc_announced = True
+                print(f'  SELF-CONSISTENCY ACTIVE: lambda {self.opt.lambda_temporal}, {occ.mean().item():.2f} of pixels gated in', flush=True)
+
         # video (temporal) discriminator: judge frame PAIRS (prev, cur). A blurry/flickering fake
         # looks fake AS A TRANSITION -> G must be both sharp AND consistent (fixes temporal-only blur).
         loss_G_VGAN = 0; loss_D_V_real = 0; loss_D_V_fake = 0
@@ -441,10 +545,11 @@ class Pix2PixHDModel(BaseModel):
         return [ self.loss_filter( loss_G_GAN, loss_G_GAN_Feat, loss_G_VGG, loss_D_real, loss_D_fake, loss_G_Temporal, loss_G_VGAN, loss_D_V_real, loss_D_V_fake ), None if not infer else fake_image ]
 
     def inference(self, label, inst, image=None, weather=None, edge=None, prev=None,
-                  mf_labels=None, mf_edges=None, depth=None, normal=None, light=None, chroma=None):
+                  mf_labels=None, mf_edges=None, depth=None, normal=None, light=None, chroma=None,
+                  texture=None, shadow=None):
         # Encode Inputs
         image = Variable(image) if image is not None else None
-        input_label, inst_map, real_image, _ = self.encode_input(Variable(label), Variable(inst), image, infer=True, weather_id=weather, edge_map=edge, depth_map=depth, normal_map=normal, light_map=light, chroma_map=chroma)
+        input_label, inst_map, real_image, _ = self.encode_input(Variable(label), Variable(inst), image, infer=True, weather_id=weather, edge_map=edge, depth_map=depth, normal_map=normal, light_map=light, chroma_map=chroma, texture_map=texture, shadow_map=shadow)
 
         # Fake Generation
         if self.use_features:

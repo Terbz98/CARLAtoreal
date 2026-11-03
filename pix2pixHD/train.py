@@ -74,7 +74,23 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         light = data['light'].cuda() if ('light' in data and torch.is_tensor(data['light'])) else None
         chroma = data['chroma'].cuda() if ('chroma' in data and torch.is_tensor(data['chroma'])) else None
         normal = data['normal'].cuda() if ('normal' in data and torch.is_tensor(data['normal'])) else None
+        texture = data['texture'].cuda() if ('texture' in data and torch.is_tensor(data['texture']) and data['texture'].dim() == 4) else None
+        shadow = data['shadow'].cuda() if ('shadow' in data and torch.is_tensor(data['shadow']) and data['shadow'].dim() == 4) else None
         prev = data['prev'].cuda() if ('prev' in data and torch.is_tensor(data['prev'])) else None
+        # Student forcing needs t-1's conditioning. The dataset returns 0 for a sample with no
+        # previous frame (start of a video), and default_collate turns that 0 into a 1-D tensor --
+        # which passes torch.is_tensor and then blows up in encode_input's one-hot, so the test
+        # has to be on RANK, not on tensor-ness. 4-D means a real map; anything else is the
+        # placeholder and the batch falls back to the real previous frame.
+        def _map4(key):
+            t = data.get(key, 0)
+            return t.cuda() if (torch.is_tensor(t) and t.dim() == 4) else None
+        prev_cond = None
+        if (getattr(opt, 'student_forcing', 0) > 0 or getattr(opt, 'self_consistency', False)) and _map4('prev_label') is not None:
+            # only tensors: DataParallel scatters kwargs recursively and a None inside the dict
+            # is a needless edge case. Missing keys are handled by .get() on the model side.
+            prev_cond = {k: v for k in ('label', 'edge', 'depth', 'normal', 'light', 'chroma', 'texture')
+                         for v in [_map4(f'prev_{k}')] if v is not None}
         flow = data['flow'].cuda() if ('flow' in data and torch.is_tensor(data['flow'])) else None
         mf_labels = mf_edges = None
         if getattr(opt, 'multiframe', False) and 'label_prev' in data:
@@ -84,7 +100,7 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             en = data['edge_next'] if torch.is_tensor(data['edge_next']) else None
             mf_edges = [ep, None, en]
         losses, generated = model(Variable(data['label']), Variable(data['inst']),
-            Variable(data['image']), Variable(data['feat']), infer=save_fake, weather=weather, edge=edge, prev=prev, flow=flow,
+            Variable(data['image']), Variable(data['feat']), infer=save_fake, weather=weather, edge=edge, prev=prev, flow=flow, prev_cond=prev_cond, texture=texture, shadow=shadow,
             mf_labels=mf_labels, mf_edges=mf_edges, depth=depth, normal=normal, light=light, chroma=chroma)
 
         # sum per device losses

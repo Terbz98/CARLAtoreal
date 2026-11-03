@@ -63,6 +63,16 @@ class AlignedDataset(BaseDataset):
             self.dir_normal = os.path.join(opt.dataroot, opt.phase + '_normal')
             self.normal_paths = sorted(make_dataset(self.dir_normal))
 
+        ### roughness prior (optional)
+        if getattr(opt, 'texture_input', False):
+            self.dir_texture = os.path.join(opt.dataroot, opt.phase + '_texture')
+            self.texture_paths = sorted(make_dataset(self.dir_texture))
+
+        ### ground-shadow prior (optional)
+        if getattr(opt, 'shadow_input', False):
+            self.dir_shadow = os.path.join(opt.dataroot, opt.phase + '_shadow')
+            self.shadow_paths = sorted(make_dataset(self.dir_shadow))
+
         ### load precomputed instance-wise encoded features
         if opt.load_features:                              
             self.dir_feat = os.path.join(opt.dataroot, opt.phase + '_feat')
@@ -142,10 +152,26 @@ class AlignedDataset(BaseDataset):
             transform_cont = get_transform(self.opt, params, method=Image.BILINEAR, normalize=False)
             chroma_tensor = transform_cont(chroma)   # 3xHxW in [0,1]
 
+        ### roughness prior (1ch in [0,1], BILINEAR -- a smooth field, and already coarse by design)
+        texture_tensor = 0
+        if getattr(self.opt, 'texture_input', False):
+            texture = Image.open(self.texture_paths[index]).convert('L')
+            transform_cont = get_transform(self.opt, params, method=Image.BILINEAR, normalize=False)
+            texture_tensor = transform_cont(texture)   # 1xHxW in [0,1]
+
+        ### ground-shadow prior (1ch in [0,1], BILINEAR -- it is a smooth luminance field like the
+        ### light map, and NEAREST would step the shadow edge the channel exists to describe)
+        shadow_tensor = 0
+        if getattr(self.opt, 'shadow_input', False):
+            shadow = Image.open(self.shadow_paths[index]).convert('L')
+            transform_cont = get_transform(self.opt, params, method=Image.BILINEAR, normalize=False)
+            shadow_tensor = transform_cont(shadow)   # 1xHxW in [0,1]
+
         input_dict = {'label': A_tensor, 'inst': inst_tensor, 'image': B_tensor,
                       'feat': feat_tensor, 'path': A_path, 'weather': weather_tensor,
                       'edge': edge_tensor, 'depth': depth_tensor, 'normal': normal_tensor,
-                      'light': light_tensor, 'chroma': chroma_tensor}
+                      'light': light_tensor, 'chroma': chroma_tensor,
+                      'texture': texture_tensor, 'shadow': shadow_tensor}
 
         return input_dict
 

@@ -20,7 +20,8 @@ class TemporalDataset(BaseDataset):
     EXTRA = {'depth_input':  ('depth',  'L'),
              'normal_input': ('normal', 'RGB'),
              'light_input':  ('light',  'L'),
-             'chroma_input': ('chroma', 'RGB')}
+             'chroma_input': ('chroma', 'RGB'),
+             'texture_input': ('texture', 'L')}
 
     def initialize(self, opt):
         self.opt = opt; self.root = opt.dataroot
@@ -58,7 +59,7 @@ class TemporalDataset(BaseDataset):
         image = t_img(Image.open(f'{self.img_dir}/{stem}.jpg').convert('RGB'))
         edge  = t_lab(Image.open(f'{self.edge_dir}/{stem}.png').convert('L'))   # [0,1]
 
-        out = {'depth': 0, 'normal': 0, 'light': 0, 'chroma': 0}
+        out = {'depth': 0, 'normal': 0, 'light': 0, 'chroma': 0, 'texture': 0}
         for sub, (d, mode) in self.extra_dirs.items():
             out[sub] = t_cont(Image.open(f'{d}/{stem}.png').convert(mode))
 
@@ -66,12 +67,33 @@ class TemporalDataset(BaseDataset):
         # (and scale the flow vectors) so it stays aligned at any loadSize/crop.
         _, Ht, Wt = image.shape
         has_prev = i > 0 and self._vid(self.A_paths[i-1]) == self._vid(A_path)
+        # STUDENT FORCING needs the previous frame's CONDITIONING, not just its image, so the
+        # model can generate its own t-1 and train on that instead of the real one. Loaded only
+        # when asked: it is an extra decode per sample and every other mode ignores it.
+        prev_cond = {'label': 0, 'edge': 0, 'depth': 0, 'normal': 0, 'light': 0, 'chroma': 0, 'texture': 0}
         if has_prev:
             pstem = os.path.splitext(os.path.basename(self.A_paths[i-1]))[0]
             prev = t_img(Image.open(f'{self.img_dir}/{pstem}.jpg').convert('RGB'))
+            if getattr(self.opt, 'student_forcing', 0) > 0 or getattr(self.opt, 'self_consistency', False):
+                prev_cond['label'] = t_lab(Image.open(self.A_paths[i-1])) * 255.0
+                prev_cond['edge'] = t_lab(Image.open(f'{self.edge_dir}/{pstem}.png').convert('L'))
+                for sub, (d, mode) in self.extra_dirs.items():
+                    prev_cond[sub] = t_cont(Image.open(f'{d}/{pstem}.png').convert(mode))
             flow = np.load(f'{self.flow_dir}/{stem}.npy').astype(np.float32)     # h0xw0x2 (t-1->t)
             h0, w0 = flow.shape[:2]
-            if (h0, w0) != (Ht, Wt):
+            if 'crop' in self.opt.resize_or_crop:
+                # follow the image transform exactly: scale to loadSize width, same crop, same flip (2026-10-30;
+                # the old path resized the whole-frame flow onto the CROP, which misaligns it)
+                Wf = self.opt.loadSize; Hf = int(round(Wf * A.size[1] / A.size[0]))
+                flow = cv2.resize(flow, (Wf, Hf), interpolation=cv2.INTER_LINEAR)
+                flow[..., 0] *= float(Wf) / w0; flow[..., 1] *= float(Hf) / h0
+                x, y = params['crop_pos']; fs = self.opt.fineSize
+                flow = flow[y:y + fs, x:x + fs]
+                if flow.shape[:2] != (Ht, Wt):
+                    flow = cv2.resize(flow, (Wt, Ht), interpolation=cv2.INTER_LINEAR)
+                if self.opt.isTrain and not self.opt.no_flip and params['flip']:
+                    flow = flow[:, ::-1].copy(); flow[..., 0] *= -1
+            elif (h0, w0) != (Ht, Wt):
                 flow = cv2.resize(flow, (Wt, Ht), interpolation=cv2.INTER_LINEAR)
                 flow[..., 0] *= float(Wt) / w0
                 flow[..., 1] *= float(Ht) / h0
@@ -82,7 +104,11 @@ class TemporalDataset(BaseDataset):
         return {'label': label, 'edge': edge, 'image': image, 'prev': prev,
                 'flow': flow_t, 'has_prev': int(has_prev), 'inst': 0, 'feat': 0,
                 'depth': out['depth'], 'normal': out['normal'],
-                'light': out['light'], 'chroma': out['chroma'],
+                'light': out['light'], 'chroma': out['chroma'], 'texture': out['texture'],
+                'prev_texture': prev_cond['texture'],
+                'prev_label': prev_cond['label'], 'prev_edge': prev_cond['edge'],
+                'prev_depth': prev_cond['depth'], 'prev_normal': prev_cond['normal'],
+                'prev_light': prev_cond['light'], 'prev_chroma': prev_cond['chroma'],
                 'weather': torch.LongTensor([0]), 'path': A_path}
 
     def __len__(self):
